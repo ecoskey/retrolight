@@ -1,6 +1,10 @@
 using Retrolight.Runtime;
+using UnityEngine;
 using UnityEngine.Rendering;
 
+[CreateAssetMenu(fileName = "Retrolight Settings", menuName = "Retrolight/Pipeline", order = 0)]
 public class RetrolightPipelineAsset : RenderPipelineAsset {
-    protected override RenderPipeline CreatePipeline() { return new RetrolightPipeline(); }
+    
+    [SerializeField, Range(1, 16)] private uint pixelScale;
+    protected override RenderPipeline CreatePipeline() { return new RetrolightPipeline(pixelScale); }
 }
