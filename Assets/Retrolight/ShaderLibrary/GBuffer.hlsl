@@ -23,7 +23,7 @@ float SampleDepth(float2 pos) { //todo: meters or just sample actual depth
 }
 
 float SampleNormals(float2 pos) {
-    return SAMPLE_TEXTURE2D(Normals, sampler_Normals, pos);
+    return SAMPLE_TEXTURE2D(Normals, sampler_Normals, pos) * 2 - 1;
 }
 
 #endif
