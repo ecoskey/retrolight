@@ -12,7 +12,7 @@ namespace Retrolight.Runtime {
         private Camera camera;
         private CullingResults cull;
 
-        private static readonly ShaderTagId geometryPassId = new ShaderTagId("Geometry");
+        private static readonly ShaderTagId geometryPassId = new ShaderTagId("GBuffer");
 
         public CameraRenderer(RenderGraph renderGraph, uint pixelScale) {
             this.renderGraph = renderGraph;
@@ -50,27 +50,56 @@ namespace Retrolight.Runtime {
         class GeometryPassData {
             public TextureHandle albedo;
             public TextureHandle depth;
+            public TextureHandle normals;
 
             public RendererListHandle geometryRenderList;
         }
 
         private GeometryPassData GeometryPass() {
             using (var builder = renderGraph.AddRenderPass("Geometry Pass", out GeometryPassData passData)) {
-                TextureHandle opaque = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
-                    colorFormat = GraphicsFormat.R8G8B8A8_UNorm,
+                TextureHandle albedo = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
+                    colorFormat = GraphicsFormat.R8G8B8_UNorm,
                     clearBuffer = true,
-                    clearColor = Color.clear,
-                    name = "Opaque Texture"
+                    clearColor = Color.black,
+                    enableRandomWrite = false,
+                    msaaSamples = MSAASamples.None,
+                    useDynamicScale = false,
+                    name = "Albedo"
                 });
-                passData.albedo = builder.UseColorBuffer(opaque, 0);
+                passData.albedo = builder.UseColorBuffer(albedo, 0);
+
+                TextureHandle depth = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
+                    colorFormat = GraphicsFormatUtility.GetGraphicsFormat(
+                        RenderTextureFormat.Depth, 
+                        QualitySettings.activeColorSpace == ColorSpace.Linear //todo: should this be != ?
+                    ),
+                    depthBufferBits = DepthBits.Depth32,                    
+                    clearBuffer = true,
+                    clearColor = Color.black,
+                    enableRandomWrite = false,
+                    msaaSamples = MSAASamples.None,
+                    useDynamicScale = false,
+                    name = "Depth"
+                });
+                passData.depth = builder.UseDepthBuffer(depth, DepthAccess.Write);
                 
-                RendererListDesc geometryRenderDesc  = new RendererListDesc(geometryPassId, cull, camera) {
+                TextureHandle normals = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
+                    colorFormat = GraphicsFormat.R8G8B8_UNorm,
+                    clearBuffer = true,
+                    clearColor = Color.black,
+                    enableRandomWrite = false,
+                    msaaSamples = MSAASamples.None,
+                    useDynamicScale = false,
+                    name = "Normals"
+                });
+                passData.normals = builder.UseColorBuffer(normals, 1);
+                
+                RendererListDesc gBufferRenderDesc  = new RendererListDesc(geometryPassId, cull, camera) {
                     sortingCriteria = SortingCriteria.CommonOpaque,
                     renderQueueRange = RenderQueueRange.opaque,
                 };
-                RendererListHandle geometryRenderHandle = renderGraph.CreateRendererList(geometryRenderDesc);
-                passData.geometryRenderList = builder.UseRendererList(geometryRenderHandle);
-        
+                RendererListHandle gBufferRenderHandle = renderGraph.CreateRendererList(gBufferRenderDesc);
+                passData.geometryRenderList = builder.UseRendererList(gBufferRenderHandle);
                 
                 builder.SetRenderFunc<GeometryPassData>(RenderGeometryPass);
                 return passData;
@@ -79,9 +108,8 @@ namespace Retrolight.Runtime {
 
         private void RenderGeometryPass(GeometryPassData passData, RenderGraphContext context) {
             CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.geometryRenderList);
+            if (camera.clearFlags == CameraClearFlags.Skybox) { context.renderContext.DrawSkybox(camera); }
         }
-        
-        
 
         class BlitPassData {
             public TextureHandle albedo;
@@ -95,9 +123,7 @@ namespace Retrolight.Runtime {
         }
 
         private void RenderBlitPass(BlitPassData passData, RenderGraphContext context) {
-            //context.cmd.Blit(passData.albedo, BuiltinRenderTextureType.CameraTarget);
-            if (camera.clearFlags == CameraClearFlags.Skybox) { context.renderContext.DrawSkybox(camera); }
-            
+            context.cmd.Blit(passData.albedo, BuiltinRenderTextureType.CameraTarget);
         }
     }
 }
