@@ -1,7 +1,5 @@
-Shader "Retrolight/Standard"
-{
-	Properties
-	{
+Shader "Retrolight/Standard" {
+	Properties {
 		[MainColor] _MainColor ("Color", Color) = (0.5, 0.5, 0.5, 1.0)
 		[MainTexture] _MainTex ("Texture", 2D) = "white" {}
 		
@@ -12,12 +10,10 @@ Shader "Retrolight/Standard"
 		_Metallic ("Metallic", Range(0, 1)) = 0
 		_Smoothness ("Smoothness", Range(0, 1)) = 0.5
 	}
-	SubShader
-	{
+	SubShader {
 		Tags { "RenderType" = "Opaque" }
 
-		Pass
-		{
+		Pass {
 			Tags { "LightMode" = "GBuffer" }
 			
 			HLSLPROGRAM
@@ -26,6 +22,19 @@ Shader "Retrolight/Standard"
 			#pragma vertex GBufferVertex
 			#pragma fragment GBufferFragment
 			#include "GBufferPass.hlsl"
+			ENDHLSL
+		}
+		
+		Pass {
+			Tags { "LightMode" = "Edges" }
+			
+			HLSLPROGRAM
+			#pragma target 3.5
+			#pragma multi_compile_instancing
+			#pragma vertex EdgesVertex
+			#pragma fragment EdgesFragment
+			#pragma shader_feature _EDGES_ENABLED
+			#include "EdgesPass.hlsl"
 			ENDHLSL
 		}
 	}

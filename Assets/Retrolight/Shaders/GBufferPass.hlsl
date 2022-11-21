@@ -5,6 +5,7 @@
 
 TEXTURE2D(_MainTex);
 SAMPLER(sampler_MainTex);
+
 TEXTURE2D(_NormalMap);
 SAMPLER(sampler_NormalMap);
 

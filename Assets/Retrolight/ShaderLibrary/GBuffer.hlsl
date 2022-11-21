@@ -3,16 +3,16 @@
 
 #include "Common.hlsl"
 
-CBUFFER_START(GBuffer)
-    TEXTURE2D(Albedo);
-    SAMPLER(sampler_Albedo);
+TEXTURE2D(Albedo);
+SAMPLER(sampler_Albedo);
 
-    TEXTURE2D(Depth);
-    SAMPLER(sampler_Depth);
+TEXTURE2D(Depth);
+SAMPLER(sampler_Depth);
 
-    TEXTURE2D(Normals);
-    SAMPLER(sampler_Normals);
-CBUFFER_END
+TEXTURE2D(Normals);
+SAMPLER(sampler_Normals);
+
+float4 resolution;
 
 float4 SampleAlbedo(float2 pos) {
     return SAMPLE_TEXTURE2D(Albedo, sampler_Albedo, pos);
@@ -23,7 +23,7 @@ float SampleDepth(float2 pos) { //todo: meters or just sample actual depth
 }
 
 float SampleNormals(float2 pos) {
-    return SAMPLE_TEXTURE2D(Normals, sampler_Normals, pos) * 2 - 1;
+    return UnpackNormal(SAMPLE_TEXTURE2D(Normals, sampler_Normals, pos));
 }
 
 #endif
