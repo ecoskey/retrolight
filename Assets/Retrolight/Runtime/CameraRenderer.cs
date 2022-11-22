@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
@@ -36,14 +37,14 @@ namespace Retrolight.Runtime {
             };
 
             using (renderGraph.RecordAndExecute(renderGraphParams)) {
-                GeometryPassData geometryPassData = GeometryPass();
+                var geometryPassData = GeometryPass();
                 BlitPass(geometryPassData.albedo);
             }
             
-            context.ExecuteCommandBuffer(cmd);
+            //context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
             
-            context.Submit();
+            //context.Submit();
             this.camera = null;
         }
 
@@ -58,39 +59,44 @@ namespace Retrolight.Runtime {
         private GeometryPassData GeometryPass() {
             using (var builder = renderGraph.AddRenderPass("Geometry Pass", out GeometryPassData passData)) {
                 TextureHandle albedo = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
-                    colorFormat = GraphicsFormat.R8G8B8_UNorm,
+                    colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, false),
+                    depthBufferBits = DepthBits.None,
                     clearBuffer = true,
                     clearColor = Color.black,
                     enableRandomWrite = false,
+                    filterMode = FilterMode.Point,
                     msaaSamples = MSAASamples.None,
                     useDynamicScale = false,
                     name = "Albedo"
                 });
                 passData.albedo = builder.UseColorBuffer(albedo, 0);
                 
-                TextureHandle normals = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
-                    colorFormat = GraphicsFormat.R8G8B8_UNorm,
-                    clearBuffer = true,
-                    clearColor = Color.black,
-                    enableRandomWrite = false,
-                    msaaSamples = MSAASamples.None,
-                    useDynamicScale = false,
-                    name = "Normals"
-                });
-                passData.normals = builder.UseColorBuffer(normals, 1);
-
                 TextureHandle depth = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
-                    colorFormat = GraphicsFormat.D24_UNorm, //revert to GraphicsFormatUtility.whatever to get depth format
-                    depthBufferBits = DepthBits.Depth32,                    
+                    colorFormat = GraphicsFormat.None,
+                    depthBufferBits = DepthBits.Depth24,
                     clearBuffer = true,
                     clearColor = Color.black,
                     enableRandomWrite = false,
+                    filterMode = FilterMode.Point,
                     msaaSamples = MSAASamples.None,
                     useDynamicScale = false,
                     name = "Depth"
                 });
                 passData.depth = builder.UseDepthBuffer(depth, DepthAccess.Write);
-
+                
+                TextureHandle normals = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
+                    colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, false),
+                    depthBufferBits = DepthBits.None,
+                    clearBuffer = true,
+                    clearColor = Color.black,
+                    enableRandomWrite = false,
+                    filterMode = FilterMode.Point,
+                    msaaSamples = MSAASamples.None,
+                    useDynamicScale = false,
+                    name = "Normals"
+                });
+                passData.normals = builder.UseColorBuffer(normals, 1);
+                
                 RendererListDesc gBufferRenderDesc  = new RendererListDesc(geometryPassId, cull, camera) {
                     sortingCriteria = SortingCriteria.CommonOpaque,
                     renderQueueRange = RenderQueueRange.opaque,
