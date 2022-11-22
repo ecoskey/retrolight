@@ -16,11 +16,11 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 
-float UnpackNormal(float3 normal) {
+float3 UnpackNormal(float3 normal) {
 	return normal * 2 - 1;
 }
 
-float PackNormal(float3 normal) {
+float3 PackNormal(float3 normal) {
 	return (normal + 1) / 2;
 }
 	

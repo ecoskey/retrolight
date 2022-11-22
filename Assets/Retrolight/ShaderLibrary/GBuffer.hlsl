@@ -19,11 +19,11 @@ float4 SampleAlbedo(float2 pos) {
 }
 
 float SampleDepth(float2 pos) { //todo: meters or just sample actual depth
-    return SAMPLE_TEXTURE2D(Depth, sampler_Depth, pos);
+    return SAMPLE_TEXTURE2D(Depth, sampler_Depth, pos).r;
 }
 
-float SampleNormals(float2 pos) {
-    return UnpackNormal(SAMPLE_TEXTURE2D(Normals, sampler_Normals, pos));
+float3 SampleNormals(float2 pos) {
+    return UnpackNormal(SAMPLE_TEXTURE2D(Normals, sampler_Normals, pos).rgb);
 }
 
 #endif

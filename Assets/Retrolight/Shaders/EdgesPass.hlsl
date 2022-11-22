@@ -12,8 +12,6 @@ UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
     UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff);
 UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
-float4 Resolution;
-
 #define InputProp(prop) UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, prop)
 
 struct Attributes {
@@ -23,8 +21,9 @@ struct Attributes {
 };
 
 struct V2F {
-    float4 positionCS : SV_POSITION
-    UNITY_VERTEX_INPUT_INSTANCE_ID
+    float4 positionCS : SV_POSITION;
+    float2 uv : V2F_UV
+    UNITY_VERTEX_INPUT_INSTANCE_ID;
 };
 
 V2F EdgesVertex(Attributes input) {
@@ -38,21 +37,22 @@ V2F EdgesVertex(Attributes input) {
     return output;
 }
 
-float2 EdgesFragment(V2F input) : SV_TARGET { //r for depth edge indicator, g for normal edge indicator
+float2 EdgesFragment(V2F input) : SV_TARGET { //r for depth edge strength, g for normal edge strength
+    UNITY_SETUP_INSTANCE_ID(input)
     float baseMap = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).a;
     float baseAlpha = InputProp(_MainColor).a;
     float alpha = baseMap * baseAlpha;
-    clip(color.a - InputProp(_Cutoff));
+    clip(alpha - InputProp(_Cutoff));
 
-    #ifndef _EDGES_ENABLED
-        return float2(0, 0);
-    #else
+    #ifdef _EDGES_ENABLED
         //todo: calculate the DEI and NEI
 
         float dei = 0;
         float nei = 0;
 
         return float2(dei, nei);
+    #else
+        return float2(0, 0);
     #endif
 }
 

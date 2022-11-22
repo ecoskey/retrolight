@@ -12,7 +12,7 @@ SAMPLER(sampler_NormalMap);
 UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
     UNITY_DEFINE_INSTANCED_PROP(float4, _MainColor);
     UNITY_DEFINE_INSTANCED_PROP(float4,_MainTex_ST);
-    UNITY_DEFINE_INSTANCED_PROP(float, NormalScale);
+    UNITY_DEFINE_INSTANCED_PROP(float, _NormalScale);
     UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff);
     UNITY_DEFINE_INSTANCED_PROP(float, _Metallic);
     UNITY_DEFINE_INSTANCED_PROP(float, _Smoothness);
@@ -30,15 +30,14 @@ struct Attributes {
 
 struct V2F {
     float4 positionCS : SV_POSITION;
-    float3 normalWS : VAR_NORMAL;
-    float2 uv : VAR_UV;
+    float3 normalWS : V2F_NORMAL;
+    float2 uv : V2F_UV;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
 struct GBufferOut {
     float3 albedo : SV_TARGET0;
-    float depth : SV_TARGET1;
-    float3 normal : SV_Target2;
+    float3 normal : SV_Target1;
 };
 
 V2F GBufferVertex(Attributes input) {
@@ -61,9 +60,7 @@ GBufferOut GBufferFragment(V2F input) {
     float4 baseColor = InputProp(_MainColor);
     float4 color = baseMap * baseColor;
     clip(color.a - InputProp(_Cutoff));
-    output.albedo = color;
-
-    //todo: write to depth buffer somehow
+    output.albedo = color.rgb;
 
     output.normal = input.normalWS;
     return output;

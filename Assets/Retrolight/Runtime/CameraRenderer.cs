@@ -67,21 +67,6 @@ namespace Retrolight.Runtime {
                     name = "Albedo"
                 });
                 passData.albedo = builder.UseColorBuffer(albedo, 0);
-
-                TextureHandle depth = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
-                    colorFormat = GraphicsFormatUtility.GetGraphicsFormat(
-                        RenderTextureFormat.Depth, 
-                        QualitySettings.activeColorSpace == ColorSpace.Linear //todo: should this be != ?
-                    ),
-                    depthBufferBits = DepthBits.Depth32,                    
-                    clearBuffer = true,
-                    clearColor = Color.black,
-                    enableRandomWrite = false,
-                    msaaSamples = MSAASamples.None,
-                    useDynamicScale = false,
-                    name = "Depth"
-                });
-                passData.depth = builder.UseDepthBuffer(depth, DepthAccess.Write);
                 
                 TextureHandle normals = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
                     colorFormat = GraphicsFormat.R8G8B8_UNorm,
@@ -93,7 +78,19 @@ namespace Retrolight.Runtime {
                     name = "Normals"
                 });
                 passData.normals = builder.UseColorBuffer(normals, 1);
-                
+
+                TextureHandle depth = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
+                    colorFormat = GraphicsFormat.D24_UNorm, //revert to GraphicsFormatUtility.whatever to get depth format
+                    depthBufferBits = DepthBits.Depth32,                    
+                    clearBuffer = true,
+                    clearColor = Color.black,
+                    enableRandomWrite = false,
+                    msaaSamples = MSAASamples.None,
+                    useDynamicScale = false,
+                    name = "Depth"
+                });
+                passData.depth = builder.UseDepthBuffer(depth, DepthAccess.Write);
+
                 RendererListDesc gBufferRenderDesc  = new RendererListDesc(geometryPassId, cull, camera) {
                     sortingCriteria = SortingCriteria.CommonOpaque,
                     renderQueueRange = RenderQueueRange.opaque,
