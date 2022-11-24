@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.AI;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
@@ -13,11 +12,15 @@ namespace Retrolight.Runtime {
         private Camera camera;
         private CullingResults cull;
 
-        private static readonly ShaderTagId geometryPassId = new ShaderTagId("GBuffer");
+        private Material testMaterial;
+
+        private static readonly ShaderTagId gBufferPassId = new ShaderTagId("GBuffer");
 
         public CameraRenderer(RenderGraph renderGraph, uint pixelScale) {
             this.renderGraph = renderGraph;
             this.pixelScale = pixelScale;
+
+            testMaterial = new Material(Shader.Find("Retrolight/TestMRT"));
         }
         
         public void Render(ScriptableRenderContext context, Camera camera) {
@@ -37,96 +40,126 @@ namespace Retrolight.Runtime {
             };
 
             using (renderGraph.RecordAndExecute(renderGraphParams)) {
-                var geometryPassData = GeometryPass();
-                BlitPass(geometryPassData.albedo);
+                var gBuffer = GBufferPass();
+                BlitPass(gBuffer, gBuffer.normal); //todo: "gBuffer.normal" should be the output of the edges pass
             }
             
-            //context.ExecuteCommandBuffer(cmd);
+            context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
             
-            //context.Submit();
+            context.Submit();
             this.camera = null;
         }
-
-        class GeometryPassData {
-            public TextureHandle albedo;
-            public TextureHandle depth;
-            public TextureHandle normals;
-
-            public RendererListHandle geometryRenderList;
+        
+        // ********************************************************************************************************** //
+        
+        private TextureHandle CreateColorTexture(string name) {
+            bool isSrgb = QualitySettings.activeColorSpace == ColorSpace.Gamma;
+            TextureDesc colorDesc = new TextureDesc(Vector2.one) {
+                colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, isSrgb),
+                depthBufferBits = DepthBits.None,
+                clearBuffer = true, //set back to true
+                clearColor = Color.black,
+                enableRandomWrite = false, 
+                filterMode = FilterMode.Point,
+                msaaSamples = MSAASamples.None,
+                useDynamicScale = false,
+                name = name
+            };
+            return renderGraph.CreateTexture(colorDesc);
         }
 
-        private GeometryPassData GeometryPass() {
-            using (var builder = renderGraph.AddRenderPass("Geometry Pass", out GeometryPassData passData)) {
-                TextureHandle albedo = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
-                    colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, false),
-                    depthBufferBits = DepthBits.None,
-                    clearBuffer = true,
-                    clearColor = Color.black,
-                    enableRandomWrite = false,
-                    filterMode = FilterMode.Point,
-                    msaaSamples = MSAASamples.None,
-                    useDynamicScale = false,
-                    name = "Albedo"
-                });
-                passData.albedo = builder.UseColorBuffer(albedo, 0);
-                
-                TextureHandle depth = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
-                    colorFormat = GraphicsFormat.None,
-                    depthBufferBits = DepthBits.Depth24,
-                    clearBuffer = true,
-                    clearColor = Color.black,
-                    enableRandomWrite = false,
-                    filterMode = FilterMode.Point,
-                    msaaSamples = MSAASamples.None,
-                    useDynamicScale = false,
-                    name = "Depth"
-                });
-                passData.depth = builder.UseDepthBuffer(depth, DepthAccess.Write);
-                
-                TextureHandle normals = renderGraph.CreateTexture(new TextureDesc(Vector2.one) {
-                    colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, false),
-                    depthBufferBits = DepthBits.None,
-                    clearBuffer = true,
-                    clearColor = Color.black,
-                    enableRandomWrite = false,
-                    filterMode = FilterMode.Point,
-                    msaaSamples = MSAASamples.None,
-                    useDynamicScale = false,
-                    name = "Normals"
-                });
-                passData.normals = builder.UseColorBuffer(normals, 1);
-                
-                RendererListDesc gBufferRenderDesc  = new RendererListDesc(geometryPassId, cull, camera) {
+        private TextureHandle CreateDepthTexture(string name) {
+            TextureDesc depthDesc = new TextureDesc(Vector2.one) {
+                colorFormat = GraphicsFormat.None,
+                depthBufferBits = DepthBits.Depth32,
+                clearBuffer = true, //set back to true
+                clearColor = Color.black, //todo: is this correct?
+                enableRandomWrite = false,
+                filterMode = FilterMode.Point,
+                msaaSamples = MSAASamples.None,
+                useDynamicScale = false,
+                name = name
+            };
+            return renderGraph.CreateTexture(depthDesc);
+        }
+        
+        // ********************************************************************************************************** //
+
+        class GBufferPassData {
+            public GBuffer gBuffer;
+            public RendererListHandle gBufferRendererList;
+        }
+
+        private GBuffer GBufferPass() {
+            using (var builder = renderGraph.AddRenderPass(
+                "Geometry Pass", 
+                out GBufferPassData passData, 
+                new ProfilingSampler("GBuffer Pass Profiler")
+            )) {
+                TextureHandle albedo = CreateColorTexture("Albedo");
+                TextureHandle depth = CreateDepthTexture("Depth");
+                TextureHandle normal = CreateColorTexture("Normal");
+
+                GBuffer gBuffer = new GBuffer(
+                    builder.UseColorBuffer(albedo, 0), 
+                    builder.UseDepthBuffer(depth, DepthAccess.Write), 
+                    builder.UseColorBuffer(normal, 0)
+                );
+                passData.gBuffer = gBuffer;
+
+                RendererListDesc gBufferRendererDesc  = new RendererListDesc(gBufferPassId, cull, camera) {
                     sortingCriteria = SortingCriteria.CommonOpaque,
-                    renderQueueRange = RenderQueueRange.opaque,
+                    renderQueueRange = RenderQueueRange.opaque
                 };
-                RendererListHandle gBufferRenderHandle = renderGraph.CreateRendererList(gBufferRenderDesc);
-                passData.geometryRenderList = builder.UseRendererList(gBufferRenderHandle);
+                RendererListHandle gBufferRenderHandle = renderGraph.CreateRendererList(gBufferRendererDesc);
+                passData.gBufferRendererList = builder.UseRendererList(gBufferRenderHandle);
                 
-                builder.SetRenderFunc<GeometryPassData>(RenderGeometryPass);
-                return passData;
+                builder.SetRenderFunc<GBufferPassData>(RenderGBufferPass);
+
+                return gBuffer;
             }
         }
 
-        private void RenderGeometryPass(GeometryPassData passData, RenderGraphContext context) {
-            CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.geometryRenderList);
-            if (camera.clearFlags == CameraClearFlags.Skybox) { context.renderContext.DrawSkybox(camera); }
+        private static void RenderGBufferPass(GBufferPassData passData, RenderGraphContext context) {
+            CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.gBufferRendererList);
         }
+        
+        // ********************************************************************************************************** //
+
+        class EdgesPassData {
+            public GBuffer gBuffer;
+            public TextureHandle edges;
+
+            public RendererListHandle edgesRendererList;
+        }
+        
+        //todo: edges pass stuff
+
+        // ********************************************************************************************************** //
 
         class BlitPassData {
-            public TextureHandle albedo;
+            public GBuffer gBuffer;
         }
 
-        private void BlitPass(TextureHandle albedo) {
-            using (var builder = renderGraph.AddRenderPass("Geometry Pass", out BlitPassData passData)) {
-                passData.albedo = builder.ReadTexture(albedo);
+        private void BlitPass(GBuffer gBuffer, TextureHandle edges) {
+            using (var builder = renderGraph.AddRenderPass(
+                "Blit Pass", 
+                out BlitPassData passData,
+                new ProfilingSampler("Blit Pass Profiler")
+            )) {
+                gBuffer.albedo = builder.ReadTexture(gBuffer.albedo);
+                gBuffer.depth = builder.ReadTexture(gBuffer.depth);
+                gBuffer.normal = builder.ReadTexture(gBuffer.normal);
+
+                passData.gBuffer = gBuffer;
                 builder.SetRenderFunc<BlitPassData>(RenderBlitPass);
             }
         }
 
-        private void RenderBlitPass(BlitPassData passData, RenderGraphContext context) {
-            context.cmd.Blit(passData.albedo, BuiltinRenderTextureType.CameraTarget);
+        private static void RenderBlitPass(BlitPassData passData, RenderGraphContext context) {
+            //todo: setup gbuffer blit pass
+            context.cmd.Blit(passData.gBuffer.albedo, BuiltinRenderTextureType.CameraTarget);
         }
     }
 }

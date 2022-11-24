@@ -18,6 +18,7 @@ Shader "Retrolight/Standard" {
 		Tags { "RenderType" = "Opaque" }
 
 		Pass {
+			Name "GBuffer Pass"
 			Tags { "LightMode" = "GBuffer" }
 			ZWrite On
 			
@@ -31,6 +32,7 @@ Shader "Retrolight/Standard" {
 		}
 		
 		Pass {
+			Name "Edges Pass"
 			Tags { "LightMode" = "Edges" }
 			ZWrite Off
 			
