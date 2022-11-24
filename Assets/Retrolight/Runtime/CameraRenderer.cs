@@ -11,16 +11,12 @@ namespace Retrolight.Runtime {
 
         private Camera camera;
         private CullingResults cull;
-
-        private Material testMaterial;
-
+        
         private static readonly ShaderTagId gBufferPassId = new ShaderTagId("GBuffer");
 
         public CameraRenderer(RenderGraph renderGraph, uint pixelScale) {
             this.renderGraph = renderGraph;
             this.pixelScale = pixelScale;
-
-            testMaterial = new Material(Shader.Find("Retrolight/TestMRT"));
         }
         
         public void Render(ScriptableRenderContext context, Camera camera) {
@@ -41,7 +37,7 @@ namespace Retrolight.Runtime {
 
             using (renderGraph.RecordAndExecute(renderGraphParams)) {
                 var gBuffer = GBufferPass();
-                BlitPass(gBuffer, gBuffer.normal); //todo: "gBuffer.normal" should be the output of the edges pass
+                BlitPass(gBuffer);
             }
             
             context.ExecuteCommandBuffer(cmd);
@@ -104,7 +100,7 @@ namespace Retrolight.Runtime {
                 GBuffer gBuffer = new GBuffer(
                     builder.UseColorBuffer(albedo, 0), 
                     builder.UseDepthBuffer(depth, DepthAccess.Write), 
-                    builder.UseColorBuffer(normal, 0)
+                    builder.UseColorBuffer(normal, 1)
                 );
                 passData.gBuffer = gBuffer;
 
@@ -142,7 +138,7 @@ namespace Retrolight.Runtime {
             public GBuffer gBuffer;
         }
 
-        private void BlitPass(GBuffer gBuffer, TextureHandle edges) {
+        private void BlitPass(GBuffer gBuffer) {
             using (var builder = renderGraph.AddRenderPass(
                 "Blit Pass", 
                 out BlitPassData passData,
