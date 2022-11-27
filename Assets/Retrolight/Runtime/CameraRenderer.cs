@@ -11,7 +11,7 @@ namespace Retrolight.Runtime {
 
         private Camera camera;
         private CullingResults cull;
-        
+
         private static readonly ShaderTagId gBufferPassId = new ShaderTagId("GBuffer");
 
         public CameraRenderer(RenderGraph renderGraph, uint pixelScale) {
@@ -51,7 +51,7 @@ namespace Retrolight.Runtime {
         
         private TextureHandle CreateColorTexture(string name) {
             bool isSrgb = QualitySettings.activeColorSpace == ColorSpace.Gamma;
-            TextureDesc colorDesc = new TextureDesc(Vector2.one) {
+            TextureDesc colorDesc = new TextureDesc(Screen.width, Screen.height) {
                 colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, isSrgb),
                 depthBufferBits = DepthBits.None,
                 clearBuffer = true, //set back to true
@@ -66,7 +66,7 @@ namespace Retrolight.Runtime {
         }
 
         private TextureHandle CreateDepthTexture(string name) {
-            TextureDesc depthDesc = new TextureDesc(Vector2.one) {
+            TextureDesc depthDesc = new TextureDesc(Screen.width, Screen.height) {
                 colorFormat = GraphicsFormat.None,
                 depthBufferBits = DepthBits.Depth32,
                 clearBuffer = true, //set back to true
@@ -96,11 +96,14 @@ namespace Retrolight.Runtime {
                 TextureHandle albedo = CreateColorTexture("Albedo");
                 TextureHandle depth = CreateDepthTexture("Depth");
                 TextureHandle normal = CreateColorTexture("Normal");
+                TextureHandle attributes = CreateColorTexture("Attributes");
+                //TextureHandle emission = CreateColorTexture("Emission");
 
                 GBuffer gBuffer = new GBuffer(
                     builder.UseColorBuffer(albedo, 0), 
                     builder.UseDepthBuffer(depth, DepthAccess.Write), 
-                    builder.UseColorBuffer(normal, 1)
+                    builder.UseColorBuffer(normal, 1),
+                    builder.UseColorBuffer(attributes, 2)
                 );
                 passData.gBuffer = gBuffer;
 
@@ -108,8 +111,8 @@ namespace Retrolight.Runtime {
                     sortingCriteria = SortingCriteria.CommonOpaque,
                     renderQueueRange = RenderQueueRange.opaque
                 };
-                RendererListHandle gBufferRenderHandle = renderGraph.CreateRendererList(gBufferRendererDesc);
-                passData.gBufferRendererList = builder.UseRendererList(gBufferRenderHandle);
+                RendererListHandle gBufferRendererHandle = renderGraph.CreateRendererList(gBufferRendererDesc);
+                passData.gBufferRendererList = builder.UseRendererList(gBufferRendererHandle);
                 
                 builder.SetRenderFunc<GBufferPassData>(RenderGBufferPass);
 
@@ -123,17 +126,6 @@ namespace Retrolight.Runtime {
         
         // ********************************************************************************************************** //
 
-        class EdgesPassData {
-            public GBuffer gBuffer;
-            public TextureHandle edges;
-
-            public RendererListHandle edgesRendererList;
-        }
-        
-        //todo: edges pass stuff
-
-        // ********************************************************************************************************** //
-
         class BlitPassData {
             public GBuffer gBuffer;
         }
@@ -144,18 +136,14 @@ namespace Retrolight.Runtime {
                 out BlitPassData passData,
                 new ProfilingSampler("Blit Pass Profiler")
             )) {
-                gBuffer.albedo = builder.ReadTexture(gBuffer.albedo);
-                gBuffer.depth = builder.ReadTexture(gBuffer.depth);
-                gBuffer.normal = builder.ReadTexture(gBuffer.normal);
-
-                passData.gBuffer = gBuffer;
+                passData.gBuffer = gBuffer.ReadAll(builder);
                 builder.SetRenderFunc<BlitPassData>(RenderBlitPass);
             }
         }
 
         private static void RenderBlitPass(BlitPassData passData, RenderGraphContext context) {
             //todo: setup gbuffer blit pass
-            context.cmd.Blit(passData.gBuffer.albedo, BuiltinRenderTextureType.CameraTarget);
+            context.cmd.Blit(passData.gBuffer.depth, BuiltinRenderTextureType.CameraTarget);
         }
     }
 }

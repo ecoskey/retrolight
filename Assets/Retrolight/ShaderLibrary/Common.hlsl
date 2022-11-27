@@ -11,17 +11,24 @@
 #define UNITY_PREV_MATRIX_I_M unity_MatrixPreviousMI
 #define UNITY_MATRIX_V unity_MatrixV
 #define UNITY_MATRIX_VP unity_MatrixVP
+#define UNITY_MATRIX_I_VP unity_MatrixInvVP
 #define UNITY_MATRIX_P glstate_matrix_projection
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 
-float3 UnpackNormal(float3 normal) {
-	return normal * 2 - 1;
+float3 DecodeNormal(float4 sample, float scale) {
+	#if defined(UNITY_NO_DXT5nm)
+	return UnpackNormalRGB(sample, scale);
+	#else
+	return UnpackNormalmapRGorAG(sample, scale);
+	#endif
 }
 
-float3 PackNormal(float3 normal) {
-	return (normal + 1) / 2;
+float3 NormalTangentToWorld (float3 normalTS, float3 normalWS, float4 tangentWS) {
+	float3x3 tangentToWorld = CreateTangentToWorld(normalWS, tangentWS.xyz, tangentWS.w);
+	return TransformTangentToWorld(normalTS, tangentToWorld);
 }
 	
 #endif

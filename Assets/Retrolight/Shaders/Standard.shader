@@ -10,7 +10,6 @@ Shader "Retrolight/Standard" {
 		_Metallic ("Metallic", Range(0, 1)) = 0.0
 		_Smoothness ("Smoothness", Range(0, 1)) = 0.5
 		
-		[Toggle(_ENABLE_EDGES)] _EnableEdges ("Use Edges", Float) = 0
 		_DepthEdgeStrength ("Depth Edge Strength", Range(0, 1)) = 0
 		_NormalEdgeStrength ("Normal Edge Strength", Range(0, 1)) = 0
 	}
@@ -20,7 +19,6 @@ Shader "Retrolight/Standard" {
 		Pass {
 			Name "GBuffer Pass"
 			Tags { "LightMode" = "GBuffer" }
-			ZWrite On
 			
 			HLSLPROGRAM
 			#pragma target 3.5
@@ -28,21 +26,6 @@ Shader "Retrolight/Standard" {
 			#pragma vertex GBufferVertex
 			#pragma fragment GBufferFragment
 			#include "GBufferPass.hlsl"
-			ENDHLSL
-		}
-		
-		Pass {
-			Name "Edges Pass"
-			Tags { "LightMode" = "Edges" }
-			ZWrite Off
-			
-			HLSLPROGRAM
-			#pragma target 3.5
-			#pragma multi_compile_instancing
-			#pragma shader_feature _EDGES_ENABLED
-			#pragma vertex EdgesVertex
-			#pragma fragment EdgesFragment
-			#include "EdgesPass.hlsl"
 			ENDHLSL
 		}
 	}
