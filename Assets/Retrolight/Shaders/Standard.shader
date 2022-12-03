@@ -1,4 +1,4 @@
-Shader "Retrolight/Standard" {
+Shader "Retrolight/StandardOpaque" {
 	Properties {
 		[MainColor] _MainColor ("Color", Color) = (0.5, 0.5, 0.5, 1.0)
 		[MainTexture] _MainTex ("Texture", 2D) = "white" {}
@@ -18,7 +18,7 @@ Shader "Retrolight/Standard" {
 
 		Pass {
 			Name "GBuffer Pass"
-			Tags { "LightMode" = "GBuffer" }
+			Tags { "LightMode" = "RetrolightGBuffer" }
 			
 			HLSLPROGRAM
 			#pragma target 3.5

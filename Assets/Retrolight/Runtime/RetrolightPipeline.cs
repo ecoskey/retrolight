@@ -6,11 +6,13 @@ namespace Retrolight.Runtime {
     public class RetrolightPipeline : RenderPipeline {
         private RenderGraph renderGraph;
         private CameraRenderer renderer;
+        public ComputeShader shader;
         private uint pixelScale;
 
-        public RetrolightPipeline(uint pixelScale) {
+        public RetrolightPipeline(uint pixelScale, ComputeShader shader) {
             renderGraph = new RenderGraph("Retrolight Render Graph");
-            renderer = new CameraRenderer(renderGraph, pixelScale);
+            renderer = new CameraRenderer(renderGraph, shader, pixelScale);
+            this.shader = shader;
         }
 
         protected override void Render(ScriptableRenderContext context, Camera[] cameras) {

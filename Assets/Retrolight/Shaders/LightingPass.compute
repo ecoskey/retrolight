@@ -1,0 +1,14 @@
+#pragma kernel LightingPass
+#pragma multi_compile _ ORTHOGRAPHIC_CAMERA
+
+#include "../ShaderLibrary/GBuffer.hlsl"
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> result;
+
+ByteAddressBuffer LightIndices;
+
+[numthreads(8, 8, 1)]
+void LightingPass(uint2 groupIdx : SV_GroupThreadID, uint2 id : SV_DispatchThreadID) {
+    
+}

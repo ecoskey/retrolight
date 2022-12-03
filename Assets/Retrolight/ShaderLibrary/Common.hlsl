@@ -18,6 +18,12 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 
+float4 Resolution;
+
+float2 RelativeUV(float2 uv, int2 pos) {
+	return uv + pos * Resolution.zw;
+}
+
 float3 DecodeNormal(float4 sample, float scale) {
 	#if defined(UNITY_NO_DXT5nm)
 	return UnpackNormalRGB(sample, scale);

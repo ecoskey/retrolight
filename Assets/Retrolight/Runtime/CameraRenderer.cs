@@ -12,11 +12,17 @@ namespace Retrolight.Runtime {
         private Camera camera;
         private CullingResults cull;
 
-        private static readonly ShaderTagId gBufferPassId = new ShaderTagId("GBuffer");
+        private readonly ComputeShader testShader;
+        private readonly int kernelId;
+        private static readonly GlobalKeyword orthographicCamera = GlobalKeyword.Create("ORTHOGRAPHIC_CAMERA");
 
-        public CameraRenderer(RenderGraph renderGraph, uint pixelScale) {
+        private static readonly ShaderTagId gBufferPassId = new ShaderTagId("RetrolightGBuffer");
+
+        public CameraRenderer(RenderGraph renderGraph, ComputeShader testShader, uint pixelScale) {
             this.renderGraph = renderGraph;
             this.pixelScale = pixelScale;
+            this.testShader = testShader;
+            kernelId = testShader.FindKernel("CullLights");
         }
         
         public void Render(ScriptableRenderContext context, Camera camera) {
@@ -51,11 +57,11 @@ namespace Retrolight.Runtime {
         
         private TextureHandle CreateColorTexture(string name) {
             bool isSrgb = QualitySettings.activeColorSpace == ColorSpace.Gamma;
-            TextureDesc colorDesc = new TextureDesc(Screen.width, Screen.height) {
+            TextureDesc colorDesc = new TextureDesc(camera.pixelWidth, camera.pixelHeight) {
                 colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, isSrgb),
                 depthBufferBits = DepthBits.None,
-                clearBuffer = true, //set back to true
-                clearColor = Color.black,
+                clearBuffer = true,
+                clearColor = Color.clear,
                 enableRandomWrite = false, 
                 filterMode = FilterMode.Point,
                 msaaSamples = MSAASamples.None,
@@ -66,7 +72,7 @@ namespace Retrolight.Runtime {
         }
 
         private TextureHandle CreateDepthTexture(string name) {
-            TextureDesc depthDesc = new TextureDesc(Screen.width, Screen.height) {
+            TextureDesc depthDesc = new TextureDesc(camera.pixelWidth, camera.pixelHeight) {
                 colorFormat = GraphicsFormat.None,
                 depthBufferBits = DepthBits.Depth32,
                 clearBuffer = true, //set back to true
@@ -128,6 +134,12 @@ namespace Retrolight.Runtime {
 
         class BlitPassData {
             public GBuffer gBuffer;
+            public TextureHandle testTex;
+            public ComputeShader shader;
+            public Camera camera;
+            public GlobalKeyword orthoCameraKeyword;
+            public int kernelIndex;
+            public Vector2Int tilingSize;
         }
 
         private void BlitPass(GBuffer gBuffer) {
@@ -137,13 +149,43 @@ namespace Retrolight.Runtime {
                 new ProfilingSampler("Blit Pass Profiler")
             )) {
                 passData.gBuffer = gBuffer.ReadAll(builder);
+                TextureDesc desc = new TextureDesc(camera.pixelWidth, camera.pixelHeight) {
+                    colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, false),
+                    depthBufferBits = DepthBits.None,
+                    clearBuffer = true,
+                    clearColor = Color.clear,
+                    enableRandomWrite = true, 
+                    filterMode = FilterMode.Point,
+                    msaaSamples = MSAASamples.None,
+                    useDynamicScale = false,
+                };
+                passData.testTex = builder.CreateTransientTexture(desc);
+                passData.shader = testShader;
+                passData.camera = camera;
+                passData.orthoCameraKeyword = orthographicCamera;
+                passData.tilingSize = new Vector2Int(camera.pixelWidth / 8, camera.pixelHeight / 8);
                 builder.SetRenderFunc<BlitPassData>(RenderBlitPass);
             }
         }
 
         private static void RenderBlitPass(BlitPassData passData, RenderGraphContext context) {
-            //todo: setup gbuffer blit pass
-            context.cmd.Blit(passData.gBuffer.depth, BuiltinRenderTextureType.CameraTarget);
+            context.cmd.SetKeyword(passData.orthoCameraKeyword, passData.camera.orthographic);
+            passData.shader.SetTexture(passData.kernelIndex, "ColorTex", passData.testTex);
+            passData.shader.SetVector(
+                "Resolution", 
+                new Vector4(
+                    passData.camera.pixelWidth, 
+                    passData.camera.pixelHeight, 
+                    1f / passData.camera.pixelWidth, 
+                    1f / passData.camera.pixelHeight
+                )
+            );
+            passData.shader.SetTexture(passData.kernelIndex, "Depth", passData.gBuffer.depth);
+            context.cmd.DispatchCompute(
+                passData.shader, passData.kernelIndex, 
+                passData.tilingSize.x, passData.tilingSize.y, 1
+            );
+            context.cmd.Blit(passData.testTex, BuiltinRenderTextureType.CameraTarget);
         }
     }
 }

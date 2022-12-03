@@ -73,8 +73,9 @@ GBufferOut GBufferFragment(V2F input) {
     output.albedo = color;
 
     float3 normal = NormalTangentToWorld(GetNormalTS(input.uv), input.normalWS, input.tangentWS);
-    output.normal = float4((normal + 1) / 2, 1);
-
+    float3 normNorm = normalize(normal);
+    output.normal = float4((normNorm + 1) / 2, 1);
+    
     output.attributes = float4(
         INPUT_PROP(_Metallic),
         INPUT_PROP(_Smoothness),

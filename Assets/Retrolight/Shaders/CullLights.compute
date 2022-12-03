@@ -1,0 +1,61 @@
+#pragma kernel CullLights
+#pragma multi_compile _ ORTHOGRAPHIC_CAMERA
+
+#include "../ShaderLibrary/GBuffer.hlsl"
+#include "../ShaderLibrary/Tiling.hlsl"
+
+//RWByteAddressBuffer Tiles;
+
+RW_TEXTURE2D(float4, ColorTex);
+
+groupshared uint tile[MAX_LIGHTS_PER_TILE / 32];
+
+//in [0,1]
+groupshared uint uMinDepth = 0xFFFFFFFF;
+groupshared uint uMaxDepth = 0;
+groupshared uint depthMask = 0;
+
+[numthreads(TILE_DIMENSION, TILE_DIMENSION, 1)]
+void CullLights(uint2 groupIdx : SV_GroupThreadID, uint2 id : SV_DispatchThreadID) {
+    //sample depth buffer at all location in tile, and InterlockedMin/Max with respective floats
+    //sync group threads
+    //get depthMask index of depth and use InterlockedOr to write to the mask
+    float2 uv = PixelToUV(id);
+
+    float depth = Sample01DepthLOD(uv, 0);
+    InterlockedMin(uMinDepth, asuint(depth));
+    InterlockedMax(uMaxDepth, asuint(depth));
+    GroupMemoryBarrierWithGroupSync();
+
+    #if UNITY_REVERSED_Z
+    float fMinDepth = asfloat(uMaxDepth);
+    float fMaxDepth = asfloat(uMinDepth);
+    #else
+    float fMinDepth = asfloat(uMinDepth);
+    float fMaxDepth = asfloat(uMaxDepth);
+    #endif
+    
+    float depthRangeRecip = 31.0 / (fMaxDepth - fMinDepth);
+    float depthMaskIndex = max(0, min(31, floor((depth - fMinDepth) * depthRangeRecip)));
+    InterlockedOr(depthMask, 1 << depthMask);
+    GroupMemoryBarrierWithGroupSync();
+    
+    /* generate frustum for tile (culling stuff)
+     * perspective camera: weirdo frustum stuff
+     * ortho camera: AABB !!!!! :)
+     */
+
+    /* CUlL THE LIGHTS
+     * loop through lights one thread group at a time
+     * construct culling structure for lights
+     * fill light depth mask
+     * test against AABB if ortho, frustum if perspective
+     * test if (lightMask & geometryMask) > 0 to decide if light affects the frustum
+     * insert into bit array with CulledLights[lightIndex / 32] |= 1 << lightIndex % 32
+     */
+
+    GroupMemoryBarrierWithGroupSync();
+
+    //loop to copy groupshared light bit array to big, concatenated global one :))))
+    ColorTex[id] = float4(fMaxDepth, fMaxDepth, fMaxDepth, 1);
+}
