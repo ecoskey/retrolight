@@ -4,7 +4,6 @@
 #include "../ShaderLibrary/Common.hlsl"
 
 #define TILE_DIMENSION 8 // tiles are 8x8
-#define MAX_LIGHTS_PER_TILE 256 // max of 256 rendered lights per tile, this is pretty reasonable
 #define SCREEN_TILES int2(Resolution.xy / TILE_DIMENSION)
 
 int LinearTileIndex(int2 tile) {

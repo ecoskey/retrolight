@@ -12,7 +12,7 @@ namespace Retrolight.Runtime {
         private Camera camera;
         private CullingResults cull;
 
-        private readonly ComputeShader testShader;
+        private readonly Material litMaterial;
         private readonly int kernelId;
         private static readonly GlobalKeyword orthographicCamera = GlobalKeyword.Create("ORTHOGRAPHIC_CAMERA");
 
@@ -21,7 +21,7 @@ namespace Retrolight.Runtime {
         public CameraRenderer(RenderGraph renderGraph, ComputeShader testShader, uint pixelScale) {
             this.renderGraph = renderGraph;
             this.pixelScale = pixelScale;
-            this.testShader = testShader;
+            this.litMaterial = CoreUtils.CreateEngineMaterial("Hidden/DumbLitPass");
             kernelId = testShader.FindKernel("CullLights");
         }
         
@@ -134,12 +134,13 @@ namespace Retrolight.Runtime {
 
         class BlitPassData {
             public GBuffer gBuffer;
-            public TextureHandle testTex;
+            public Material litMaterial;
+            /*public TextureHandle testTex;
             public ComputeShader shader;
             public Camera camera;
             public GlobalKeyword orthoCameraKeyword;
             public int kernelIndex;
-            public Vector2Int tilingSize;
+            public Vector2Int tilingSize;*/
         }
 
         private void BlitPass(GBuffer gBuffer) {
@@ -149,7 +150,7 @@ namespace Retrolight.Runtime {
                 new ProfilingSampler("Blit Pass Profiler")
             )) {
                 passData.gBuffer = gBuffer.ReadAll(builder);
-                TextureDesc desc = new TextureDesc(camera.pixelWidth, camera.pixelHeight) {
+                /*TextureDesc desc = new TextureDesc(camera.pixelWidth, camera.pixelHeight) {
                     colorFormat = GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, false),
                     depthBufferBits = DepthBits.None,
                     clearBuffer = true,
@@ -158,18 +159,19 @@ namespace Retrolight.Runtime {
                     filterMode = FilterMode.Point,
                     msaaSamples = MSAASamples.None,
                     useDynamicScale = false,
-                };
-                passData.testTex = builder.CreateTransientTexture(desc);
+                };*/
+                /*passData.testTex = builder.CreateTransientTexture(desc);
                 passData.shader = testShader;
                 passData.camera = camera;
                 passData.orthoCameraKeyword = orthographicCamera;
-                passData.tilingSize = new Vector2Int(camera.pixelWidth / 8, camera.pixelHeight / 8);
+                passData.tilingSize = new Vector2Int(camera.pixelWidth / 8, camera.pixelHeight / 8);*/
+                passData.litMaterial = litMaterial;
                 builder.SetRenderFunc<BlitPassData>(RenderBlitPass);
             }
         }
 
         private static void RenderBlitPass(BlitPassData passData, RenderGraphContext context) {
-            context.cmd.SetKeyword(passData.orthoCameraKeyword, passData.camera.orthographic);
+            /*context.cmd.SetKeyword(passData.orthoCameraKeyword, passData.camera.orthographic);
             passData.shader.SetTexture(passData.kernelIndex, "ColorTex", passData.testTex);
             passData.shader.SetVector(
                 "Resolution", 
@@ -185,7 +187,11 @@ namespace Retrolight.Runtime {
                 passData.shader, passData.kernelIndex, 
                 passData.tilingSize.x, passData.tilingSize.y, 1
             );
-            context.cmd.Blit(passData.testTex, BuiltinRenderTextureType.CameraTarget);
+            context.cmd.Blit(passData.testTex, BuiltinRenderTextureType.CameraTarget);*/
+            context.cmd.SetGlobalTexture("Albedo", passData.gBuffer.albedo);
+            context.cmd.SetGlobalTexture("Depth", passData.gBuffer.depth);
+            context.cmd.SetGlobalTexture("Normal", passData.gBuffer.normal);
+            context.cmd.Blit(null, BuiltinRenderTextureType.CameraTarget, passData.litMaterial);
         }
     }
 }

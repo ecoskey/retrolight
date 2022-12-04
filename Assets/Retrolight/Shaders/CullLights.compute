@@ -7,9 +7,6 @@
 //RWByteAddressBuffer Tiles;
 
 RW_TEXTURE2D(float4, ColorTex);
-
-groupshared uint tile[MAX_LIGHTS_PER_TILE / 32];
-
 //in [0,1]
 groupshared uint uMinDepth = 0xFFFFFFFF;
 groupshared uint uMaxDepth = 0;

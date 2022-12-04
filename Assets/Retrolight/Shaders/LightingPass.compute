@@ -6,8 +6,6 @@
 // with cs.SetTexture
 RWTexture2D<float4> result;
 
-ByteAddressBuffer LightIndices;
-
 [numthreads(8, 8, 1)]
 void LightingPass(uint2 groupIdx : SV_GroupThreadID, uint2 id : SV_DispatchThreadID) {
     
