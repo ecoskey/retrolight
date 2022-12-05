@@ -22,7 +22,7 @@ UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 #define INPUT_PROP(prop) UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, prop)
 
-struct Attributes {
+struct VertexInput {
     float3 positionOS : POSITION;
     float3 normalOS : NORMAL;
     float4 tangentOS : TANGENT;
@@ -51,7 +51,7 @@ float3 GetNormalTS (float2 baseUV) {
     return normal;
 }
 
-V2F GBufferVertex(Attributes input) {
+V2F GBufferVertex(VertexInput input) {
     V2F output;
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_TRANSFER_INSTANCE_ID(input, output);

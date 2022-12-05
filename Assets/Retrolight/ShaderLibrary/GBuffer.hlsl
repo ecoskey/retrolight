@@ -12,12 +12,15 @@ SAMPLER(sampler_Depth);
 TEXTURE2D(Normal);
 SAMPLER(sampler_Normal);
 
-float4 SampleAlbedo(float2 pos) {
-    return SAMPLE_TEXTURE2D(Albedo, sampler_Albedo, pos);
+TEXTURE2D(Attributes);
+SAMPLER(sampler_Attributes);
+
+float4 SampleAlbedo(float2 uv) {
+    return SAMPLE_TEXTURE2D(Albedo, sampler_Albedo, uv);
 }
 
-float4 SampleAlbedoLOD(float2 pos, float lod) {
-    return SAMPLE_TEXTURE2D_LOD(Albedo, sampler_Albedo, pos, lod);
+float4 SampleAlbedoLOD(float2 uv, float lod) {
+    return SAMPLE_TEXTURE2D_LOD(Albedo, sampler_Albedo, uv, lod);
 }
 
 float Ortho01Depth(float depth) {
@@ -32,62 +35,56 @@ float OrthoEyeDepth(float depth) {
     return lerp(_ProjectionParams.y, _ProjectionParams.z, Ortho01Depth(depth));
 }
 
-//todo: look into shader variant stuff for reducing extra work calculated
-
-float Sample01Depth(float2 pos) {
-    float rawDepth = SAMPLE_DEPTH_TEXTURE(Depth, sampler_Depth, pos);
-    #if ORTHOGRAPHIC_CAMERA
-    return Ortho01Depth(rawDepth);
-    #else
+float Sample01Depth(float2 uv) {
+    const float rawDepth = SAMPLE_DEPTH_TEXTURE(Depth, sampler_Depth, uv);
+    if (ORTHOGRAPHIC_CAMERA) return Ortho01Depth(rawDepth);
     return Linear01DepthFromNear(rawDepth, _ZBufferParams);
-    #endif
 }
 
-float Sample01DepthLOD(float2 pos, float lod) {
-    float rawDepth = SAMPLE_DEPTH_TEXTURE_LOD(Depth, sampler_Depth, pos, lod);
-    #if ORTHOGRAPHIC_CAMERA
-    return Ortho01Depth(rawDepth);
-    #else
+float Sample01DepthLOD(float2 uv, float lod) {
+    const float rawDepth = SAMPLE_DEPTH_TEXTURE_LOD(Depth, sampler_Depth, uv, lod);
+    if (ORTHOGRAPHIC_CAMERA) return Ortho01Depth(rawDepth);
     return Linear01DepthFromNear(rawDepth, _ZBufferParams);
-    #endif
 }
 
-float SampleEyeDepth(float2 pos) {
-    float rawDepth = SAMPLE_DEPTH_TEXTURE(Depth, sampler_Depth, pos);
-    #if ORTHOGRAPHIC_CAMERA
-    return OrthoEyeDepth(rawDepth);
-    #else
+float SampleEyeDepth(float2 uv) {
+    const float rawDepth = SAMPLE_DEPTH_TEXTURE(Depth, sampler_Depth, uv);
+    if (ORTHOGRAPHIC_CAMERA) return OrthoEyeDepth(rawDepth);
     return LinearEyeDepth(rawDepth, _ZBufferParams);
-    #endif
 }
 
-float SampleEyeDepthLOD(float2 pos, float lod) {
-    float rawDepth = SAMPLE_DEPTH_TEXTURE_LOD(Depth, sampler_Depth, pos, lod);
-    #if ORTHOGRAPHIC_CAMERA
-    return OrthoEyeDepth(rawDepth);
-    #else
+float SampleEyeDepthLOD(float2 uv, float lod) {
+    const float rawDepth = SAMPLE_DEPTH_TEXTURE_LOD(Depth, sampler_Depth, uv, lod);
+    if (ORTHOGRAPHIC_CAMERA) return OrthoEyeDepth(rawDepth);
     return LinearEyeDepth(rawDepth, _ZBufferParams);
-    #endif
+}
+
+float3 SampleNormal(float2 uv) {
+    return SAMPLE_TEXTURE2D(Normal, sampler_Normal, uv).rgb * 2 - 1;
+}
+
+float3 SampleNormalLOD(float2 uv, float lod) {
+    return SAMPLE_TEXTURE2D_LOD(Normal, sampler_Normal, uv, lod).rgb * 2 - 1;
+}
+
+float4 SampleAttributes(float2 uv) {
+    return SAMPLE_TEXTURE2D(Attributes, sampler_Attributes, uv);
+}
+
+float4 SampleAttributesLOD(float2 uv, float lod) {
+    return SAMPLE_TEXTURE2D_LOD(Attributes, sampler_Attributes, uv, lod);
 }
 
 float3 WorldSpaceFromDepth(float2 ndc) {
-    float depth = Sample01Depth(ndc);
-    float remappedDepth = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
+    const float depth = Sample01Depth(ndc);
+    const float remappedDepth = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
     return ComputeWorldSpacePosition(ndc, remappedDepth, UNITY_MATRIX_I_VP);
 }
 
 float3 WorldSpaceFromDepthLOD(float2 ndc, float lod) {
-    float depth = Sample01DepthLOD(ndc, lod);
-    float remappedDepth = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
+    const float depth = Sample01DepthLOD(ndc, lod);
+    const float remappedDepth = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
     return ComputeWorldSpacePosition(ndc, remappedDepth, UNITY_MATRIX_I_VP);
-}
-
-float3 SampleNormal(float2 pos) {
-    return SAMPLE_TEXTURE2D(Normal, sampler_Normal, pos).rgb * 2 - 1;
-}
-
-float3 SampleNormalLOD(float2 pos, float lod) {
-    return SAMPLE_TEXTURE2D_LOD(Normal, sampler_Normal, pos, lod).rgb * 2 - 1;
 }
 
 #endif

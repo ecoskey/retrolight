@@ -23,6 +23,4 @@ struct Sphere {
     float radius;
 };
 
-
-
 #endif
