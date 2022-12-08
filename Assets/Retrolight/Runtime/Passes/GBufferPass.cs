@@ -14,10 +14,10 @@ namespace Retrolight.Runtime.Passes {
 
         public static GBuffer Run(RenderGraph renderGraph, Camera camera, CullingResults cull) {
             using (var builder = renderGraph.AddRenderPass(
-                    "Geometry Pass", 
-                    out GBufferPassData passData, 
-                    new ProfilingSampler("GBuffer Pass Profiler")
-                )) {
+                "Geometry Pass", 
+                out GBufferPassData passData, 
+                new ProfilingSampler("GBuffer Pass Profiler")
+            )) {
                 var test = TextureUtility.Color(camera, "Albedo");
                 TextureHandle albedo = renderGraph.CreateTexture(test);
                 

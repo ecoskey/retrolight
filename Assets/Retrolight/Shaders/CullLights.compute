@@ -3,33 +3,50 @@
 #include "../ShaderLibrary/GBuffer.hlsl"
 #include "../ShaderLibrary/Tiling.hlsl"
 #include "../ShaderLibrary/Light.hlsl"
+#include "../ShaderLibrary/Culling.hlsl"
 
 #define BUCKET_SIZE 32
 #define TILE_BUCKET_COUNT (MAX_LIGHTS / BUCKET_SIZE)
 
+uint LightCount;
+StructuredBuffer<Light> Lights;
 RWByteAddressBuffer AllTiles;
 
-groupshared uint tile[MAX_LIGHTS / BUCKET_SIZE];
+groupshared uint tile[TILE_BUCKET_COUNT];
 groupshared uint uMinDepth = 0xFFFFFFFF;
 groupshared uint uMaxDepth = 0;
 groupshared uint depthMask = 0;
 
 struct ThreadInfo {
     uint2 id : SV_GroupID;
-    uint2 subId : SV_GroupThreadID;
-    uint2 dispatchId : SV_DispatchThreadID;
     uint index : SV_GroupIndex;
+    uint2 dispatchId : SV_DispatchThreadID;
+    uint2 subId : SV_GroupThreadID;
 };
 
-[numthreads(TILE_DIMENSION, TILE_DIMENSION, 1)]
+void AllowLight(uint index) {
+    uint bucketIndex = index / BUCKET_SIZE;
+    uint bitIndex = index % BUCKET_SIZE;
+    InterlockedOr(tile[bucketIndex], 1 << bitIndex);
+}
+
+uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip) {
+    const float minDepth = screenVolume.pos.z - screenVolume.r;
+    const float maxDepth = screenVolume.pos.z + screenVolume.r;
+    const uint minIndex = clamp(0, BUCKET_SIZE - 1, floor((minDepth - fMinDepth) * depthRangeRecip));
+    const uint maxIndex = clamp(0, BUCKET_SIZE - 1, floor((maxDepth - fMinDepth) * depthRangeRecip));
+    uint mask = 0xFFFFFFFF;
+    mask >>= 31 - (maxIndex - minIndex);
+    mask <<= minIndex;
+    return mask;
+}
+
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void CullLights(ThreadInfo input) {
-    //sample depth buffer at all location in tile, and InterlockedMin/Max with respective floats
-    //sync group threads
-    //get depthMask index of depth and use InterlockedOr to write to the mask
     const float2 uv = PixelToUV(input.dispatchId);
 
     //look into parallel reduction rather than atomics
-    const float depth = Sample01DepthLOD(uv, 0);
+    const float depth = SampleEyeDepthLOD(uv, 0);
     InterlockedMin(uMinDepth, asuint(depth));
     InterlockedMax(uMaxDepth, asuint(depth));
     GroupMemoryBarrierWithGroupSync();
@@ -43,41 +60,48 @@ void CullLights(ThreadInfo input) {
     #endif
     
     const float depthRangeRecip = float(BUCKET_SIZE) / (fMaxDepth - fMinDepth);
-    const uint depthMaskIndex = max(0, min(BUCKET_SIZE - 1, floor((depth - fMinDepth) * depthRangeRecip)));
-    InterlockedOr(depthMask, 1 << depthMaskIndex);
+    const uint depthMaskIndex = clamp(floor((depth - fMinDepth) * depthRangeRecip), 0, BUCKET_SIZE - 1);
+    InterlockedOr(depthMask, 1 << depthMaskIndex); //look into wave intrinsics and scalarization
 
     uint i;
-    const uint subIndex = input.subId.y * TILE_DIMENSION + input.subId.y;
 
-    UNITY_UNROLL //should be fine unless max light count is absolutely absurd (loop only runs once with 1024 lights)
-    for (i = subIndex; i < TILE_BUCKET_COUNT; i += TILE_DIMENSION * TILE_DIMENSION) {
+    UNITY_UNROLL
+    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
         tile[i] = 0; 
     }
 
     GroupMemoryBarrierWithGroupSync();
-    
-    //oops, get linear group index instead of groupIdx
-    for (i = subIndex; i < MAX_LIGHTS; i += TILE_DIMENSION * TILE_DIMENSION) {
-        uint bucketIndex = i / BUCKET_SIZE;
-        uint bitIndex = i % BUCKET_SIZE;
 
-        /* CUlL THE LIGHTS
-         * loop through lights one thread group at a time
-         * construct culling structure for lights
-         * fill light depth mask
-         * test against AABB if ortho, frustum if perspective
-         * test if (lightMask & geometryMask) > 0 to decide if light affects the frustum
-         * insert into bit array with tileLightmask[lightIndex / 32] |= 1 << lightIndex % 32
-         * ^^this but interlockedOr
-         */
+    //todo: possible inaccuracy sampling at center of pixel, not corner
+    const float2 minUv = PixelToUV(input.id * TILE_SIZE * TILE_SIZE);
+    const float2 maxUv = PixelToUV((input.id + 1) * TILE_SIZE * TILE_SIZE);
+    const AABB tileVolume = OrthoVolumeFromUVDepth(minUv, maxUv, fMinDepth, fMaxDepth);
+    
+    UNITY_LOOP
+    for (i = input.index; i < MAX_LIGHTS; i += TILE_SIZE * TILE_SIZE) {
+        Light light = Lights[i];
+        switch(light.Type()) {
+            case DIRECTIONAL_LIGHT:
+                AllowLight(i);
+                break;
+            case POINT_LIGHT:
+                Sphere volume = PointLightCullVolume(light);
+                TransformSphereToView(volume);
+                if (!SphereIntersectsAABB(volume, tileVolume)) break; //todo: test culling against camera frustum/aabb
+                uint lightDepthMask = PointLightMask(volume, fMinDepth, depthRangeRecip);
+                if (lightDepthMask & depthMask) AllowLight(i);
+                break;
+            case SPOT_LIGHT: break;
+            case LINE_LIGHT: break;
+            default: break;
+        }
     }
 
     GroupMemoryBarrierWithGroupSync();
 
-    const uint globalTileOffset = input.index * TILE_BUCKET_COUNT;
-    //loop to copy groupshared light bit array to big, concatenated global one :))))
+    const uint globalTileOffset = (input.id.y * width_tiles + input.id.x) * TILE_BUCKET_COUNT;
     UNITY_UNROLL
-    for (i = subIndex; i < TILE_BUCKET_COUNT; i += TILE_DIMENSION * TILE_DIMENSION) {
-        AllTiles.Store(globalTileOffset + i, tile[i]); //index is incorrect, should be linear tile index + i
+    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
+        AllTiles.Store(globalTileOffset + i, tile[i]);
     }
 }

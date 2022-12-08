@@ -40,16 +40,21 @@ namespace Retrolight.Runtime {
             };
 
             using (renderGraph.RecordAndExecute(renderGraphParams)) 
-                RenderPasses(context, camera, cull);
+                RenderPasses(camera, cull);
 
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
             context.Submit();
         }
         
-        private void RenderPasses(ScriptableRenderContext context, Camera camera, CullingResults cull) {
+        private void RenderPasses(Camera camera, CullingResults cull) {
             var gBuffer = GBufferPass.Run(renderGraph, camera, cull);
-            BlitPass.Run(renderGraph, gBuffer);
+            //possible other pass for determining tile depths, so that we can use parallel reduction
+            //and pass depth data to SSAO pass?
+            LightingPass.Run(renderGraph, camera, cull, gBuffer); //should return light and culling results, and a final color buffer
+            //TransparentsPass -> writes to final color buffer
+            //PostProcessPass -> writes to final color buffer after all other shaders
+            BlitPass.Run(renderGraph, gBuffer); 
         }
 
         protected override void Dispose(bool disposing) {
