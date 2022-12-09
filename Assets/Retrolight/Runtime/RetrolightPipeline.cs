@@ -9,6 +9,7 @@ namespace Retrolight.Runtime {
 
         public RetrolightPipeline(int pixelScale) {
             renderGraph = new RenderGraph("Retrolight Render Graph");
+            Blitter.Initialize(null, null); //todo: blit shaders! dumb but necessary
             //RTHandles.Initialize(Screen.width, Screen.height);
         }
         protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
@@ -54,14 +55,14 @@ namespace Retrolight.Runtime {
             LightingPass.Run(renderGraph, camera, cull, gBuffer); //should return light and culling results, and a final color buffer
             //TransparentsPass -> writes to final color buffer
             //PostProcessPass -> writes to final color buffer after all other shaders
-            BlitPass.Run(renderGraph, gBuffer); 
+            FinalPass.Run(renderGraph, camera, gBuffer.albedo); 
         }
 
         protected override void Dispose(bool disposing) {
-            if (disposing) {
-                renderGraph.Cleanup();
-                renderGraph = null;
-            }
+            if (!disposing) return;
+            Blitter.Cleanup();
+            renderGraph.Cleanup();
+            renderGraph = null;
         }
     }
 }

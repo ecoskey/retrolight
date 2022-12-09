@@ -11,6 +11,7 @@ namespace Retrolight.Runtime.Passes {
         class LightingPassData {
             public NativeArray<VisibleLight> lights;
             public int lightCount;
+            public Vector2Int tileCount;
             public ComputeBufferHandle lightsBuffer;
             public ComputeBufferHandle culledLightsBuffer;
 
@@ -32,9 +33,18 @@ namespace Retrolight.Runtime.Passes {
                 };
                 var lightsBuffer = renderGraph.CreateComputeBuffer(lightsDesc);
                 passData.lightsBuffer = builder.WriteComputeBuffer(lightsBuffer);
+
+                Vector2Int tileCount = new Vector2Int(
+                    Mathf.CeilToInt(camera.pixelWidth / 8f),
+                    Mathf.CeilToInt(camera.pixelHeight / 8f)
+                );
+                passData.tileCount = tileCount;
                 
                 //size shouldn't be relevant for this right??
-                var culledLightsDesc = new ComputeBufferDesc(Mathf.CeilToInt(MaximumLights / 32f) /* TIMES NUMBER OF TILES */, sizeof(uint)) {
+                var culledLightsDesc = new ComputeBufferDesc(
+                    Mathf.CeilToInt(MaximumLights / 32f) * tileCount.x * tileCount.y, 
+                    sizeof(uint)
+                ) {
                     name = "CulledLights", 
                     type = ComputeBufferType.Raw,
                 };
