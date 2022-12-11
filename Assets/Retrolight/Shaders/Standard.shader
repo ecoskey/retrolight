@@ -14,10 +14,13 @@ Shader "Retrolight/StandardOpaque" {
 		_NormalEdgeStrength ("Normal Edge Strength", Range(0, 1)) = 0
 	}
 	SubShader {
-		Tags { "RenderType" = "Opaque" }
+		Tags { 
+			"RenderType" = "Opaque" 
+			"RenderPipeline" = "Retrolight"
+		}
 
 		Pass {
-			Name "GBuffer Pass"
+			Name "GBufferPass"
 			Tags { "LightMode" = "RetrolightGBuffer" }
 			
 			HLSLPROGRAM

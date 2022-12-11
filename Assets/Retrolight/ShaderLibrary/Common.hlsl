@@ -20,12 +20,6 @@
 
 #define ORTHOGRAPHIC_CAMERA unity_OrthoParams.w
 
-float4 Resolution;
-
-float2 RelativeUV(float2 uv, int2 pos) {
-	return uv + pos * Resolution.zw;
-}
-
 uint2 PackFloat3(float3 src) {
 	return uint2(
 		f32tof16(src.x) | f32tof16(src.y) << 16,

@@ -22,7 +22,7 @@ namespace Retrolight.Runtime {
             colorFormat = format,
             depthBufferBits = DepthBits.None,
             clearBuffer = true,
-            clearColor = UColor.black,
+            clearColor = UColor.clear,
             enableRandomWrite = false, 
             filterMode = FilterMode.Point,
             msaaSamples = MSAASamples.None,

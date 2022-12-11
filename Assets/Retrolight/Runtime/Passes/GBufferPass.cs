@@ -4,15 +4,21 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
 
 namespace Retrolight.Runtime.Passes {
-    public static class GBufferPass {
+    public class GBufferPass {
         private static readonly ShaderTagId gBufferPassId = new ShaderTagId("RetrolightGBuffer");
+
+        private readonly RenderGraph renderGraph;
         
         class GBufferPassData {
             public GBuffer gBuffer;
             public RendererListHandle gBufferRendererList;
         }
 
-        public static GBuffer Run(RenderGraph renderGraph, Camera camera, CullingResults cull) {
+        public GBufferPass(RenderGraph renderGraph) {
+            this.renderGraph = renderGraph;
+        }
+
+        public GBuffer Run(Camera camera, CullingResults cull) {
             using (var builder = renderGraph.AddRenderPass(
                 "Geometry Pass", 
                 out GBufferPassData passData, 

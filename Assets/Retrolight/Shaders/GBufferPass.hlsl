@@ -7,11 +7,10 @@ TEXTURE2D(_MainTex);
 SAMPLER(sampler_MainTex);
 
 TEXTURE2D(_NormalMap);
-//SAMPLER(sampler_NormalMap);
 
 UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
     UNITY_DEFINE_INSTANCED_PROP(float4, _MainColor)
-    UNITY_DEFINE_INSTANCED_PROP(float4,_MainTex_ST)
+    UNITY_DEFINE_INSTANCED_PROP(float4, _MainTex_ST)
     UNITY_DEFINE_INSTANCED_PROP(float, _NormalScale)
     UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
     UNITY_DEFINE_INSTANCED_PROP(float, _Metallic)
@@ -44,7 +43,7 @@ struct GBufferOut {
     float4 attributes : SV_Target2;
 };
 
-float3 GetNormalTS (float2 baseUV) {
+float3 GetNormalTS(float2 baseUV) {
     float4 map = SAMPLE_TEXTURE2D(_NormalMap, sampler_MainTex, baseUV);
     float scale = INPUT_PROP(_NormalScale);
     float3 normal = DecodeNormal(map, scale);

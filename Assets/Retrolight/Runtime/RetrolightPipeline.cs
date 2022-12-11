@@ -6,12 +6,24 @@ using Retrolight.Runtime.Passes;
 namespace Retrolight.Runtime {
     public class RetrolightPipeline : RenderPipeline {
         private RenderGraph renderGraph;
+        private readonly ShaderBundle shaderBundle;
 
-        public RetrolightPipeline(int pixelScale) {
+        private GBufferPass gBufferPass;
+        private LightingPass lightingPass;
+        private FinalPass finalPass;
+
+        public RetrolightPipeline(ShaderBundle shaderBundle, uint pixelScale) {
             renderGraph = new RenderGraph("Retrolight Render Graph");
-            Blitter.Initialize(null, null); //todo: blit shaders! dumb but necessary
+            this.shaderBundle = shaderBundle;
+
+            gBufferPass = new GBufferPass(renderGraph);
+            lightingPass = new LightingPass(renderGraph, shaderBundle);
+            finalPass = new FinalPass(renderGraph);
+            
+            Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
             //RTHandles.Initialize(Screen.width, Screen.height);
         }
+        
         protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
             //TODO: FIGURE OUT DUMB RTHANDLE SCALE BUG
             /*Debug.Log(RTHandles.maxWidth);
@@ -49,17 +61,20 @@ namespace Retrolight.Runtime {
         }
         
         private void RenderPasses(Camera camera, CullingResults cull) {
-            var gBuffer = GBufferPass.Run(renderGraph, camera, cull);
-            //possible other pass for determining tile depths, so that we can use parallel reduction
-            //and pass depth data to SSAO pass?
-            LightingPass.Run(renderGraph, camera, cull, gBuffer); //should return light and culling results, and a final color buffer
+            var gBuffer = gBufferPass.Run(camera, cull);
+            lightingPass.Run(camera, cull, gBuffer); //should return light and culling results, and a final color buffer
             //TransparentsPass -> writes to final color buffer
             //PostProcessPass -> writes to final color buffer after all other shaders
-            FinalPass.Run(renderGraph, camera, gBuffer.albedo); 
+            finalPass.Run(camera, gBuffer.Albedo); //todo: use final color buffer as input
         }
 
         protected override void Dispose(bool disposing) {
             if (!disposing) return;
+            
+            gBufferPass = null;
+            lightingPass = null;
+            finalPass = null;
+
             Blitter.Cleanup();
             renderGraph.Cleanup();
             renderGraph = null;

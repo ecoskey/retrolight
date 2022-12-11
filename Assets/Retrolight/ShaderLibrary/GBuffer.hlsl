@@ -4,23 +4,18 @@
 #include "Common.hlsl"
 
 TEXTURE2D(Albedo);
-SAMPLER(sampler_Albedo);
-
 TEXTURE2D(Depth);
-SAMPLER(sampler_Depth);
-
 TEXTURE2D(Normal);
-SAMPLER(sampler_Normal);
-
 TEXTURE2D(Attributes);
-SAMPLER(sampler_Attributes);
+
+SAMPLER(sampler_PointClamp);
 
 float4 SampleAlbedo(float2 uv) {
-    return SAMPLE_TEXTURE2D(Albedo, sampler_Albedo, uv);
+    return SAMPLE_TEXTURE2D(Albedo, sampler_PointClamp, uv);
 }
 
-float4 SampleAlbedoLOD(float2 uv, float lod) {
-    return SAMPLE_TEXTURE2D_LOD(Albedo, sampler_Albedo, uv, lod);
+float4 LoadAlbedo(uint2 pos) {
+    return LOAD_TEXTURE2D(Albedo, pos);
 }
 
 float Ortho01Depth(float depth) {
@@ -36,46 +31,46 @@ float OrthoEyeDepth(float depth) {
 }
 
 float Sample01Depth(float2 uv) {
-    const float rawDepth = SAMPLE_DEPTH_TEXTURE(Depth, sampler_Depth, uv);
+    const float rawDepth = SAMPLE_DEPTH_TEXTURE(Depth, sampler_PointClamp, uv);
     if (ORTHOGRAPHIC_CAMERA) return Ortho01Depth(rawDepth);
     return Linear01DepthFromNear(rawDepth, _ZBufferParams);
 }
 
-float Sample01DepthLOD(float2 uv, float lod) {
-    const float rawDepth = SAMPLE_DEPTH_TEXTURE_LOD(Depth, sampler_Depth, uv, lod);
+float Load01Depth(uint2 pos) {
+    const float rawDepth = LOAD_TEXTURE2D(Depth, pos).r;
     if (ORTHOGRAPHIC_CAMERA) return Ortho01Depth(rawDepth);
     return Linear01DepthFromNear(rawDepth, _ZBufferParams);
 }
 
 float SampleEyeDepth(float2 uv) {
-    const float rawDepth = SAMPLE_DEPTH_TEXTURE(Depth, sampler_Depth, uv);
+    const float rawDepth = SAMPLE_DEPTH_TEXTURE(Depth, sampler_PointClamp, uv);
     if (ORTHOGRAPHIC_CAMERA) return OrthoEyeDepth(rawDepth);
     return LinearEyeDepth(rawDepth, _ZBufferParams);
 }
 
-float SampleEyeDepthLOD(float2 uv, float lod) {
-    const float rawDepth = SAMPLE_DEPTH_TEXTURE_LOD(Depth, sampler_Depth, uv, lod);
+float LoadEyeDepth(uint2 pos) {
+    const float rawDepth = LOAD_TEXTURE2D(Depth, pos).r;
     if (ORTHOGRAPHIC_CAMERA) return OrthoEyeDepth(rawDepth);
     return LinearEyeDepth(rawDepth, _ZBufferParams);
 }
 
 float3 SampleNormal(float2 uv) {
-    return SAMPLE_TEXTURE2D(Normal, sampler_Normal, uv).rgb * 2 - 1;
+    return SAMPLE_TEXTURE2D(Normal, sampler_PointClamp, uv).rgb * 2 - 1;
 }
 
-float3 SampleNormalLOD(float2 uv, float lod) {
-    return SAMPLE_TEXTURE2D_LOD(Normal, sampler_Normal, uv, lod).rgb * 2 - 1;
+float3 LoadNormal(uint2 pos) {
+    return LOAD_TEXTURE2D(Normal, pos).rgb * 2 - 1;
 }
 
 float4 SampleAttributes(float2 uv) {
-    return SAMPLE_TEXTURE2D(Attributes, sampler_Attributes, uv);
+    return SAMPLE_TEXTURE2D(Attributes, sampler_PointClamp, uv);
 }
 
-float4 SampleAttributesLOD(float2 uv, float lod) {
-    return SAMPLE_TEXTURE2D_LOD(Attributes, sampler_Attributes, uv, lod);
+float4 LoadAttributes(uint2 pos) {
+    return LOAD_TEXTURE2D(Attributes, pos);
 }
 
-float3 WorldSpaceFromDepth(float2 ndc) {
+/*float3 WorldSpaceFromDepth(float2 ndc) {
     const float depth = Sample01Depth(ndc);
     const float remappedDepth = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
     return ComputeWorldSpacePosition(ndc, remappedDepth, UNITY_MATRIX_I_VP);
@@ -85,6 +80,6 @@ float3 WorldSpaceFromDepthLOD(float2 ndc, float lod) {
     const float depth = Sample01DepthLOD(ndc, lod);
     const float remappedDepth = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
     return ComputeWorldSpacePosition(ndc, remappedDepth, UNITY_MATRIX_I_VP);
-}
+}*/
 
 #endif

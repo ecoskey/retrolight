@@ -43,10 +43,8 @@ uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip)
 
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void CullLights(ThreadInfo input) {
-    const float2 uv = PixelToUV(input.dispatchId);
-
     //look into parallel reduction rather than atomics
-    const float depth = SampleEyeDepthLOD(uv, 0);
+    const float depth = LoadEyeDepth(input.dispatchId);
     InterlockedMin(uMinDepth, asuint(depth));
     InterlockedMax(uMaxDepth, asuint(depth));
     GroupMemoryBarrierWithGroupSync();
@@ -99,7 +97,7 @@ void CullLights(ThreadInfo input) {
 
     GroupMemoryBarrierWithGroupSync();
 
-    const uint globalTileOffset = (input.id.y * width_tiles + input.id.x) * TILE_BUCKET_COUNT;
+    const uint globalTileOffset = (input.id.y * TileCount.x + input.id.x) * TILE_BUCKET_COUNT;
     UNITY_UNROLL
     for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
         AllTiles.Store(globalTileOffset + i, tile[i]);
