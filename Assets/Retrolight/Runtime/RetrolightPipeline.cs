@@ -62,10 +62,10 @@ namespace Retrolight.Runtime {
         
         private void RenderPasses(Camera camera, CullingResults cull) {
             var gBuffer = gBufferPass.Run(camera, cull);
-            lightingPass.Run(camera, cull, gBuffer); //should return light and culling results, and a final color buffer
+            LightingPass.Out lightingOut = lightingPass.Run(camera, cull, gBuffer);
             //TransparentsPass -> writes to final color buffer
             //PostProcessPass -> writes to final color buffer after all other shaders
-            finalPass.Run(camera, gBuffer.Albedo); //todo: use final color buffer as input
+            finalPass.Run(camera, lightingOut.FinalColor); //todo: use final color buffer as input
         }
 
         protected override void Dispose(bool disposing) {

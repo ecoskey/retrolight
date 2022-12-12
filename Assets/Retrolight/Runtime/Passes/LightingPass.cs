@@ -9,7 +9,19 @@ namespace Retrolight.Runtime.Passes {
         public const int MaximumLights = 1024;
 
         private readonly RenderGraph renderGraph;
-        private readonly ShaderBundle shaderBundle;
+
+        private readonly ComputeShader cullLights;
+        private readonly int cullLightsKernelId;
+
+        private readonly ComputeShader lightingPass;
+        private readonly int lightingPassKernelId;
+
+        private static readonly int
+            lightCountId = Shader.PropertyToID("LightCount"),
+            lightBufferId = Shader.PropertyToID("Lights"),
+            culledLightsId = Shader.PropertyToID("AllTiles"),
+            finalColorId = Shader.PropertyToID("FinalColor");
+
 
         class LightingPassData {
             public NativeArray<VisibleLight> Lights;
@@ -43,7 +55,10 @@ namespace Retrolight.Runtime.Passes {
 
         public LightingPass(RenderGraph renderGraph, ShaderBundle shaderBundle) {
             this.renderGraph = renderGraph;
-            this.shaderBundle = shaderBundle;
+            cullLights = shaderBundle.LightCullShader;
+            cullLightsKernelId = cullLights.FindKernel("CullLights");
+            lightingPass = shaderBundle.LightingShader;
+            lightingPassKernelId = lightingPass.FindKernel("LightingPass");
         }
 
         public Out Run(Camera camera, CullingResults cull, GBuffer gBuffer) {
@@ -77,6 +92,7 @@ namespace Retrolight.Runtime.Passes {
                 ) {
                     name = "CulledLights", 
                     type = ComputeBufferType.Raw,
+                    
                 };
                 var culledLightsBuffer = renderGraph.CreateComputeBuffer(culledLightsDesc);
                 culledLightsBuffer = builder.WriteComputeBuffer(culledLightsBuffer);
@@ -95,16 +111,34 @@ namespace Retrolight.Runtime.Passes {
             }
         }
 
-        private static void Render(LightingPassData passData, RenderGraphContext context) {
+        private void Render(LightingPassData passData, RenderGraphContext context) {
             NativeArray<VisibleLight> lights = passData.Lights;
             ComputeBuffer lightsBuffer = passData.LightsBuffer;
             ComputeBuffer culledLightsBuffer = passData.CulledLightsBuffer;
 
-            NativeArray<PackedLight> packedLights = lightsBuffer.BeginWrite<PackedLight>(0, passData.LightCount);
+            PackedLight[] packedLights = new PackedLight[passData.LightCount];
             for (int i = 0; i < passData.LightCount; i++) {
                 packedLights[i] = new PackedLight(lights[i]);
             }
-            lightsBuffer.EndWrite<PackedLight>(passData.LightCount);
+            
+            context.cmd.SetBufferData(lightsBuffer, packedLights, 0, 0, passData.LightCount);
+            
+            context.cmd.SetGlobalInt(lightCountId, passData.LightCount);
+            context.cmd.SetGlobalBuffer(lightBufferId, lightsBuffer);
+            context.cmd.SetGlobalBuffer(culledLightsId, culledLightsBuffer);
+            
+            context.cmd.DispatchCompute(
+                cullLights, cullLightsKernelId, 
+                passData.TileCount.x, passData.TileCount.y, 1
+            );
+            
+            context.cmd.SetGlobalTexture(finalColorId, passData.FinalColor);
+            
+            context.cmd.DispatchCompute(
+                lightingPass, lightingPassKernelId, 
+                passData.TileCount.x, passData.TileCount.y, 1
+            );
+            //packedLights.Dispose()
         }
     }
 }

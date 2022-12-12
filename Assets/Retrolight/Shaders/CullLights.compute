@@ -44,7 +44,8 @@ uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip)
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void CullLights(ThreadInfo input) {
     //look into parallel reduction rather than atomics
-    const float depth = LoadEyeDepth(input.dispatchId);
+    //const float depth = LoadEyeDepth(input.dispatchId);
+    const float depth = 0;
     InterlockedMin(uMinDepth, asuint(depth));
     InterlockedMax(uMaxDepth, asuint(depth));
     GroupMemoryBarrierWithGroupSync();
@@ -71,8 +72,10 @@ void CullLights(ThreadInfo input) {
     GroupMemoryBarrierWithGroupSync();
 
     //todo: possible inaccuracy sampling at center of pixel, not corner
-    const float2 minUv = PixelToUV(input.id * TILE_SIZE * TILE_SIZE);
-    const float2 maxUv = PixelToUV((input.id + 1) * TILE_SIZE * TILE_SIZE);
+    //const float2 minUv = PixelToUV(input.id * TILE_SIZE * TILE_SIZE);
+    //const float2 maxUv = PixelToUV((input.id + 1) * TILE_SIZE * TILE_SIZE);
+    float2 minUv = 0;
+    float2 maxUv = 1;
     const AABB tileVolume = OrthoVolumeFromUVDepth(minUv, maxUv, fMinDepth, fMaxDepth);
     
     UNITY_LOOP

@@ -9,7 +9,7 @@ namespace Retrolight.Runtime {
         [SerializeField] private Shader blitShader;
         [SerializeField] private Shader blitWithDepthShader;
 
-        public ComputeShader LightCullShader => LightCullShader;
+        public ComputeShader LightCullShader => lightCullShader;
         public ComputeShader LightingShader => lightingShader;
 
         public Shader BlitShader => blitShader;
