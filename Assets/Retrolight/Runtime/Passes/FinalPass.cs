@@ -7,9 +7,9 @@ namespace Retrolight.Runtime.Passes {
         private readonly RenderGraph renderGraph;
         
         class FinalPassData {
-            public Camera camera;
-            public TextureHandle finalColor;
-            public TextureHandle cameraTarget;
+            public Camera Camera;
+            public TextureHandle FinalColorTex;
+            public TextureHandle CameraTarget;
         }
 
         public FinalPass(RenderGraph renderGraph) {
@@ -17,30 +17,28 @@ namespace Retrolight.Runtime.Passes {
         }
 
         public void Run(Camera camera, TextureHandle finalColor) {
-            using (var builder = renderGraph.AddRenderPass(
+            using var builder = renderGraph.AddRenderPass(
                 "Final Pass", 
                 out FinalPassData passData,
                 new ProfilingSampler("Final Pass Profiler")
-            )) {
-                passData.camera = camera;
-                passData.finalColor = builder.ReadTexture(finalColor);
-                TextureHandle cameraTarget = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CameraTarget);
-                passData.cameraTarget = builder.WriteTexture(cameraTarget);
-                builder.SetRenderFunc<FinalPassData>(RenderBlitPass);
-            }
+            );
+            
+            passData.Camera = camera;
+            passData.FinalColorTex = builder.ReadTexture(finalColor);
+            TextureHandle cameraTarget = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CameraTarget);
+            passData.CameraTarget = builder.WriteTexture(cameraTarget);
+            builder.SetRenderFunc<FinalPassData>(RenderBlitPass);
         }
 
         private static void RenderBlitPass(FinalPassData passData, RenderGraphContext context) {
+            /*if (passData.Camera.clearFlags == CameraClearFlags.Skybox) {
+                context.renderContext.DrawSkybox(passData.Camera);
+            }*/
             Blitter.BlitCameraTexture(
-                context.cmd, passData.finalColor, 
-                passData.cameraTarget, new Vector4(1, 1, 0, 0) //todo: pixel perfect offset bs
+                context.cmd, passData.FinalColorTex,
+                passData.CameraTarget, new Vector4(1, 1, 0, 0) //todo: pixel perfect offset bs
             );
-            
-            //context.cmd.Blit(passData.finalColor, BuiltinRenderTextureType.CameraTarget);
-            
-            if (passData.camera.clearFlags == CameraClearFlags.Skybox) {
-                context.renderContext.DrawSkybox(passData.camera);
-            }
+            context.renderContext.DrawUIOverlay(passData.Camera);
         }
     }
 }

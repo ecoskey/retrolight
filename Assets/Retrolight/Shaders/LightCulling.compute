@@ -1,16 +1,17 @@
-#pragma kernel CullLights
+#pragma kernel LightCulling
 
-#include "../ShaderLibrary/GBuffer.hlsl"
+#include "../ShaderLibrary/Common.hlsl"
 #include "../ShaderLibrary/Tiling.hlsl"
 #include "../ShaderLibrary/Light.hlsl"
 #include "../ShaderLibrary/Culling.hlsl"
+#include "../ShaderLibrary/GBuffer.hlsl"
 
 #define BUCKET_SIZE 32
 #define TILE_BUCKET_COUNT (MAX_LIGHTS / BUCKET_SIZE)
 
 uint LightCount;
 StructuredBuffer<Light> Lights;
-RWByteAddressBuffer AllTiles;
+RWByteAddressBuffer CullingResults;
 
 groupshared uint tile[TILE_BUCKET_COUNT];
 groupshared uint uMinDepth = 0xFFFFFFFF;
@@ -42,12 +43,20 @@ uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip)
 }
 
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
-void CullLights(ThreadInfo input) {
+void LightCulling(ThreadInfo input) {
     //look into parallel reduction rather than atomics
-    //const float depth = LoadEyeDepth(input.dispatchId);
-    const float depth = 0;
-    InterlockedMin(uMinDepth, asuint(depth));
-    InterlockedMax(uMaxDepth, asuint(depth));
+    const float depth = LoadEyeDepth(input.dispatchId);
+    #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
+        const float _minDepth = WaveActiveMin(depth);
+        const float _maxDepth = WaveActiveMax(depth);
+        if (WaveIsFirstLane()) {
+            InterlockedMin(uMinDepth, asuint(_minDepth));
+            InterlockedMax(uMaxDepth, asuint(_maxDepth));
+        }
+    #else
+        InterlockedMin(uMinDepth, asuint(depth));
+        InterlockedMax(uMaxDepth, asuint(depth));
+    #endif
     GroupMemoryBarrierWithGroupSync();
 
     #if UNITY_REVERSED_Z
@@ -60,8 +69,16 @@ void CullLights(ThreadInfo input) {
     
     const float depthRangeRecip = float(BUCKET_SIZE) / (fMaxDepth - fMinDepth);
     const uint depthMaskIndex = clamp(floor((depth - fMinDepth) * depthRangeRecip), 0, BUCKET_SIZE - 1);
-    InterlockedOr(depthMask, 1 << depthMaskIndex); //look into wave intrinsics and scalarization
-
+    uint partialDepthMask = 1 << depthMaskIndex;
+    #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
+        partialDepthMask = WaveActiveBitOr(partialDepthMask);
+        if (WaveIsFirstLane()) {
+            InterlockedOr(depthMask, partialDepthMask);
+        }
+    #else
+        InterlockedOr(depthMask, partialDepthMask);
+    #endif
+    
     uint i;
 
     UNITY_UNROLL
@@ -100,9 +117,9 @@ void CullLights(ThreadInfo input) {
 
     GroupMemoryBarrierWithGroupSync();
 
-    const uint globalTileOffset = (input.id.y * TileCount.x + input.id.x) * TILE_BUCKET_COUNT;
+    const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
     UNITY_UNROLL
     for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
-        AllTiles.Store(globalTileOffset + i, tile[i]);
+        CullingResults.Store(globalTileOffset + i, tile[i]);
     }
 }

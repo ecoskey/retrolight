@@ -10,135 +10,159 @@ namespace Retrolight.Runtime.Passes {
 
         private readonly RenderGraph renderGraph;
 
-        private readonly ComputeShader cullLights;
-        private readonly int cullLightsKernelId;
+        private readonly ComputeShader lightCullingShader;
+        private readonly int lightCullingKernelId;
 
-        private readonly ComputeShader lightingPass;
-        private readonly int lightingPassKernelId;
-
+        private readonly ComputeShader lightingShader;
+        private readonly int lightingKernelId;
+        
         private static readonly int
-            lightCountId = Shader.PropertyToID("LightCount"),
-            lightBufferId = Shader.PropertyToID("Lights"),
-            culledLightsId = Shader.PropertyToID("AllTiles"),
-            finalColorId = Shader.PropertyToID("FinalColor");
-
+            LightCountId = Shader.PropertyToID("LightCount"),
+            LightBufferId = Shader.PropertyToID("Lights"),
+            CullingResultsId = Shader.PropertyToID("CullingResults"),
+            FinalColorTexId = Shader.PropertyToID("FinalColorTex");
 
         class LightingPassData {
             public NativeArray<VisibleLight> Lights;
             public int LightCount;
             public Vector2Int TileCount;
-            public ComputeBufferHandle LightsBuffer;
-            public ComputeBufferHandle CulledLightsBuffer;
+            public ComputeBufferHandle LightBuffer;
+            public ComputeBufferHandle CullingResultsBuffer;
+            public Vector4 Resolution;
 
             public GBuffer GBuffer;
-            public TextureHandle FinalColor;
+            public TextureHandle FinalColorTex;
         }
 
-        public struct Out {
+        public struct LightingOut {
             public readonly int LightCount;
             public readonly ComputeBufferHandle LightsBuffer;
-            public readonly ComputeBufferHandle CulledLightsBuffer;
+            public readonly ComputeBufferHandle CullingResultsBuffer;
             public readonly TextureHandle FinalColor;
 
-            public Out(
+            public LightingOut(
                 int lightCount,
                 ComputeBufferHandle lightsBuffer,
-                ComputeBufferHandle culledLightsBuffer,
+                ComputeBufferHandle cullingResultsBuffer,
                 TextureHandle finalColor
             ) {
                 LightCount = lightCount;
                 LightsBuffer = lightsBuffer;
-                CulledLightsBuffer = culledLightsBuffer;
+                CullingResultsBuffer = cullingResultsBuffer;
                 FinalColor = finalColor;
             }
         }
 
         public LightingPass(RenderGraph renderGraph, ShaderBundle shaderBundle) {
             this.renderGraph = renderGraph;
-            cullLights = shaderBundle.LightCullShader;
-            cullLightsKernelId = cullLights.FindKernel("CullLights");
-            lightingPass = shaderBundle.LightingShader;
-            lightingPassKernelId = lightingPass.FindKernel("LightingPass");
+            lightCullingShader = shaderBundle.LightCullShader;
+            lightCullingKernelId = lightCullingShader.FindKernel("LightCulling");
+            lightingShader = shaderBundle.LightingShader;
+            lightingKernelId = lightingShader.FindKernel("Lighting");
         }
 
-        public Out Run(Camera camera, CullingResults cull, GBuffer gBuffer) {
-            using (var builder = renderGraph.AddRenderPass(
+        public LightingOut Run(Camera camera, CullingResults cull, GBuffer gBuffer) {
+            using var builder = renderGraph.AddRenderPass(
                 "Lighting Pass", 
                 out LightingPassData passData, 
                 new ProfilingSampler("GBuffer Pass Profiler")
-            )) {
-                passData.Lights = cull.visibleLights;
-                int lightCount = Math.Min(passData.Lights.Length, MaximumLights);
-                passData.LightCount = lightCount;
-
-                var lightsDesc = new ComputeBufferDesc(MaximumLights, PackedLight.Stride) {
-                    name = "Lights",
-                    type = ComputeBufferType.Structured
-                };
-                var lightsBuffer = renderGraph.CreateComputeBuffer(lightsDesc);
-                lightsBuffer = builder.WriteComputeBuffer(lightsBuffer);
-                passData.LightsBuffer = lightsBuffer;
-
-                Vector2Int tileCount = new Vector2Int(
-                    Mathf.CeilToInt(camera.pixelWidth / 8f),
-                    Mathf.CeilToInt(camera.pixelHeight / 8f)
-                );
-                passData.TileCount = tileCount;
+            );
+            
+            passData.Lights = cull.visibleLights;
+            int lightCount = Math.Min(passData.Lights.Length, MaximumLights);
+            passData.LightCount = lightCount;
                 
-                //size shouldn't be relevant for this right??
-                var culledLightsDesc = new ComputeBufferDesc(
-                    Mathf.CeilToInt(MaximumLights / 32f) * tileCount.x * tileCount.y, 
-                    sizeof(uint)
-                ) {
-                    name = "CulledLights", 
-                    type = ComputeBufferType.Raw,
-                    
-                };
-                var culledLightsBuffer = renderGraph.CreateComputeBuffer(culledLightsDesc);
-                culledLightsBuffer = builder.WriteComputeBuffer(culledLightsBuffer);
-                passData.CulledLightsBuffer = culledLightsBuffer;
+            Vector2Int tileCount = new Vector2Int(
+                Mathf.CeilToInt(camera.pixelWidth / 8f),
+                Mathf.CeilToInt(camera.pixelHeight / 8f)
+            );
+            passData.TileCount = tileCount;
 
-                passData.GBuffer = gBuffer.ReadAll(builder);
+            var lightsDesc = new ComputeBufferDesc(MaximumLights, PackedLight.Stride) {
+                name = "Lights",
+                type = ComputeBufferType.Structured
+            };
+            var lightsBuffer = renderGraph.CreateComputeBuffer(lightsDesc);
+            lightsBuffer = builder.WriteComputeBuffer(lightsBuffer);
+            passData.LightBuffer = lightsBuffer;
+                
+            var culledLightsDesc = new ComputeBufferDesc(
+                Mathf.CeilToInt(MaximumLights / 32f) * tileCount.x * tileCount.y, 
+                sizeof(uint)
+            ) {
+                name = "CulledLights", 
+                type = ComputeBufferType.Raw,
+            };
+            var culledLightsBuffer = renderGraph.CreateComputeBuffer(culledLightsDesc);
+            culledLightsBuffer = builder.WriteComputeBuffer(culledLightsBuffer);
+            passData.CullingResultsBuffer = culledLightsBuffer;
 
-                var finalColor = renderGraph.CreateTexture(TextureUtility.Color(camera));
-                finalColor = builder.WriteTexture(finalColor);
-                passData.FinalColor = finalColor;
+            passData.GBuffer = gBuffer.ReadAll(builder);
 
-                builder.EnableAsyncCompute(true);
-                builder.SetRenderFunc<LightingPassData>(Render);
+            var finalColorDesc = TextureUtility.Color(camera, "FinalColor");
+            finalColorDesc.enableRandomWrite = true;
+            var finalColor = renderGraph.CreateTexture(finalColorDesc);
+            finalColor = builder.WriteTexture(finalColor);
+            passData.FinalColorTex = finalColor;
 
-                return new Out(passData.LightCount, lightsBuffer, culledLightsBuffer, finalColor);
-            }
+            passData.Resolution = new Vector4(
+                camera.pixelWidth, camera.pixelHeight, 
+                1f / camera.pixelWidth, 1f / camera.pixelHeight
+            );
+
+            builder.EnableAsyncCompute(true);
+            builder.SetRenderFunc<LightingPassData>(Render);
+
+            return new LightingOut(passData.LightCount, lightsBuffer, culledLightsBuffer, finalColor);
         }
 
         private void Render(LightingPassData passData, RenderGraphContext context) {
             NativeArray<VisibleLight> lights = passData.Lights;
-            ComputeBuffer lightsBuffer = passData.LightsBuffer;
-            ComputeBuffer culledLightsBuffer = passData.CulledLightsBuffer;
-
-            PackedLight[] packedLights = new PackedLight[passData.LightCount];
+            ComputeBuffer lightBuffer = passData.LightBuffer;
+            ComputeBuffer cullingResultsBuffer = passData.CullingResultsBuffer;
+            
+            NativeArray<PackedLight> packedLights = new NativeArray<PackedLight>( //todo: this is a lot of allocation/deallocation each frame
+                MaximumLights, Allocator.Temp,
+                NativeArrayOptions.UninitializedMemory
+            );
             for (int i = 0; i < passData.LightCount; i++) {
                 packedLights[i] = new PackedLight(lights[i]);
             }
             
-            context.cmd.SetBufferData(lightsBuffer, packedLights, 0, 0, passData.LightCount);
+            context.cmd.SetBufferData(lightBuffer, packedLights, 0, 0, passData.LightCount);
             
-            context.cmd.SetGlobalInt(lightCountId, passData.LightCount);
-            context.cmd.SetGlobalBuffer(lightBufferId, lightsBuffer);
-            context.cmd.SetGlobalBuffer(culledLightsId, culledLightsBuffer);
-            
+            context.cmd.SetGlobalVector("Resolution", passData.Resolution);
+
+            //tiled light culling compute shader
+            context.cmd.SetComputeIntParam(lightCullingShader, LightCountId, passData.LightCount);
+            context.cmd.SetComputeBufferParam(
+                lightCullingShader, lightCullingKernelId, LightBufferId, lightBuffer
+            );
+            context.cmd.SetComputeBufferParam(
+                lightCullingShader, lightCullingKernelId, CullingResultsId, cullingResultsBuffer
+            );
             context.cmd.DispatchCompute(
-                cullLights, cullLightsKernelId, 
+                lightCullingShader, lightCullingKernelId, 
+                passData.TileCount.x, passData.TileCount.y, 1
+            );
+
+            //lighting calculation compute shader
+            context.cmd.SetComputeIntParam(lightCullingShader, LightCountId, passData.LightCount);
+            context.cmd.SetComputeBufferParam(
+                lightingShader, lightingKernelId, LightBufferId, lightBuffer
+            );
+            context.cmd.SetComputeBufferParam(
+                lightingShader, lightingKernelId, CullingResultsId, cullingResultsBuffer
+            );
+            context.cmd.SetComputeTextureParam(
+                lightingShader, lightingKernelId, FinalColorTexId, passData.FinalColorTex
+            );
+            context.cmd.DispatchCompute(
+                lightingShader, lightingKernelId, 
                 passData.TileCount.x, passData.TileCount.y, 1
             );
             
-            context.cmd.SetGlobalTexture(finalColorId, passData.FinalColor);
-            
-            context.cmd.DispatchCompute(
-                lightingPass, lightingPassKernelId, 
-                passData.TileCount.x, passData.TileCount.y, 1
-            );
-            //packedLights.Dispose()
+            packedLights.Dispose();
         }
     }
 }

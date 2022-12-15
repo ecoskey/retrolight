@@ -10,6 +10,7 @@ namespace Retrolight.Runtime {
 
         private GBufferPass gBufferPass;
         private LightingPass lightingPass;
+        private TransparentPass transparentPass;
         private FinalPass finalPass;
 
         public RetrolightPipeline(ShaderBundle shaderBundle, uint pixelScale) {
@@ -18,6 +19,7 @@ namespace Retrolight.Runtime {
 
             gBufferPass = new GBufferPass(renderGraph);
             lightingPass = new LightingPass(renderGraph, shaderBundle);
+            transparentPass = new TransparentPass(renderGraph);
             finalPass = new FinalPass(renderGraph);
             
             Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
@@ -62,7 +64,8 @@ namespace Retrolight.Runtime {
         
         private void RenderPasses(Camera camera, CullingResults cull) {
             var gBuffer = gBufferPass.Run(camera, cull);
-            LightingPass.Out lightingOut = lightingPass.Run(camera, cull, gBuffer);
+            var lightingOut = lightingPass.Run(camera, cull, gBuffer);
+            transparentPass.Run(camera, cull, lightingOut.FinalColor);
             //TransparentsPass -> writes to final color buffer
             //PostProcessPass -> writes to final color buffer after all other shaders
             finalPass.Run(camera, lightingOut.FinalColor); //todo: use final color buffer as input
@@ -73,6 +76,7 @@ namespace Retrolight.Runtime {
             
             gBufferPass = null;
             lightingPass = null;
+            transparentPass = null;
             finalPass = null;
 
             Blitter.Cleanup();

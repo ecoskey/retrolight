@@ -5,13 +5,18 @@ using UnityEngine.Rendering.RendererUtils;
 
 namespace Retrolight.Runtime.Passes {
     public class GBufferPass {
-        private static readonly ShaderTagId gBufferPassId = new ShaderTagId("RetrolightGBuffer");
+        private static readonly ShaderTagId GBufferPassId = new ShaderTagId("RetrolightGBuffer");
+        private static readonly int
+            AlbedoTexId = Shader.PropertyToID("AlbedoTex"),
+            DepthTexId = Shader.PropertyToID("DepthTex"),
+            NormalTexId = Shader.PropertyToID("NormalTex"),
+            AttributesTexId = Shader.PropertyToID("AttributesTex");
 
         private readonly RenderGraph renderGraph;
         
         class GBufferPassData {
-            public GBuffer gBuffer;
-            public RendererListHandle gBufferRendererList;
+            public GBuffer GBuffer;
+            public RendererListHandle GBufferRendererList;
         }
 
         public GBufferPass(RenderGraph renderGraph) {
@@ -19,41 +24,43 @@ namespace Retrolight.Runtime.Passes {
         }
 
         public GBuffer Run(Camera camera, CullingResults cull) {
-            using (var builder = renderGraph.AddRenderPass(
+            using var builder = renderGraph.AddRenderPass(
                 "Geometry Pass", 
                 out GBufferPassData passData, 
                 new ProfilingSampler("GBuffer Pass Profiler")
-            )) {
-                var test = TextureUtility.Color(camera, "Albedo");
-                TextureHandle albedo = renderGraph.CreateTexture(test);
+            );
+            
+            TextureHandle albedo = renderGraph.CreateTexture(TextureUtility.Color(camera, "AlbedoTex"));
+            TextureHandle depth = renderGraph.CreateTexture(TextureUtility.Depth(camera, "DepthTex"));
+            TextureHandle normal = renderGraph.CreateTexture(TextureUtility.Color(camera, "NormalTex"));
+            TextureHandle attributes = renderGraph.CreateTexture(TextureUtility.Color(camera, "AttributesTex"));
+
+            GBuffer gBuffer = new GBuffer(
+                builder.UseColorBuffer(albedo, 0), 
+                builder.UseDepthBuffer(depth, DepthAccess.Write), 
+                builder.UseColorBuffer(normal, 1),
+                builder.UseColorBuffer(attributes, 2)
+            );
+            passData.GBuffer = gBuffer;
+
+            RendererListDesc gBufferRendererDesc  = new RendererListDesc(GBufferPassId, cull, camera) {
+                sortingCriteria = SortingCriteria.CommonOpaque,
+                renderQueueRange = RenderQueueRange.opaque
+            };
+            RendererListHandle gBufferRendererHandle = renderGraph.CreateRendererList(gBufferRendererDesc);
+            passData.GBufferRendererList = builder.UseRendererList(gBufferRendererHandle);
                 
-                TextureHandle depth = renderGraph.CreateTexture(TextureUtility.Depth(camera, "Depth"));
-                TextureHandle normal = renderGraph.CreateTexture(TextureUtility.Color(camera, "Normal"));
-                TextureHandle attributes = renderGraph.CreateTexture(TextureUtility.Color(camera, "Attributes"));
-
-                GBuffer gBuffer = new GBuffer(
-                    builder.UseColorBuffer(albedo, 0), 
-                    builder.UseDepthBuffer(depth, DepthAccess.Write), 
-                    builder.UseColorBuffer(normal, 1),
-                    builder.UseColorBuffer(attributes, 2)
-                );
-                passData.gBuffer = gBuffer;
-
-                RendererListDesc gBufferRendererDesc  = new RendererListDesc(gBufferPassId, cull, camera) {
-                    sortingCriteria = SortingCriteria.CommonOpaque,
-                    renderQueueRange = RenderQueueRange.opaque
-                };
-                RendererListHandle gBufferRendererHandle = renderGraph.CreateRendererList(gBufferRendererDesc);
-                passData.gBufferRendererList = builder.UseRendererList(gBufferRendererHandle);
-                
-                builder.SetRenderFunc<GBufferPassData>(Render);
-
-                return gBuffer;
-            }
+            builder.SetRenderFunc<GBufferPassData>(Render);
+            return gBuffer;
         }
 
         private static void Render(GBufferPassData passData, RenderGraphContext context) {
-            CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.gBufferRendererList);
+            CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.GBufferRendererList);
+            
+            context.cmd.SetGlobalTexture(AlbedoTexId, passData.GBuffer.Albedo);
+            context.cmd.SetGlobalTexture(DepthTexId, passData.GBuffer.Depth);
+            context.cmd.SetGlobalTexture(NormalTexId, passData.GBuffer.Normal);
+            context.cmd.SetGlobalTexture(AttributesTexId, passData.GBuffer.Attributes);
         }
     }
 }

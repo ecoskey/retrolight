@@ -19,6 +19,15 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 
 #define ORTHOGRAPHIC_CAMERA unity_OrthoParams.w
+#define DEFAULT_SAMPLER sampler_PointClamp		
+
+SAMPLER(sampler_PointClamp);
+
+CBUFFER_START(TilingData)
+	uint2 TileCount;
+	uint2 PixelResolution;
+	float4 Resolution;
+CBUFFER_END
 
 uint2 PackFloat3(float3 src) {
 	return uint2(
