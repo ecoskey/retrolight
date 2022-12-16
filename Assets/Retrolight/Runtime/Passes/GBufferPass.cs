@@ -30,10 +30,10 @@ namespace Retrolight.Runtime.Passes {
                 new ProfilingSampler("GBuffer Pass Profiler")
             );
             
-            TextureHandle albedo = renderGraph.CreateTexture(TextureUtility.Color(camera, "AlbedoTex"));
-            TextureHandle depth = renderGraph.CreateTexture(TextureUtility.Depth(camera, "DepthTex"));
-            TextureHandle normal = renderGraph.CreateTexture(TextureUtility.Color(camera, "NormalTex"));
-            TextureHandle attributes = renderGraph.CreateTexture(TextureUtility.Color(camera, "AttributesTex"));
+            TextureHandle albedo = renderGraph.CreateTexture(TextureUtility.ColorTex("AlbedoTex"));
+            TextureHandle depth = renderGraph.CreateTexture(TextureUtility.DepthTex());
+            TextureHandle normal = renderGraph.CreateTexture(TextureUtility.ColorTex("NormalTex"));
+            TextureHandle attributes = renderGraph.CreateTexture(TextureUtility.ColorTex("AttributesTex"));
 
             GBuffer gBuffer = new GBuffer(
                 builder.UseColorBuffer(albedo, 0), 

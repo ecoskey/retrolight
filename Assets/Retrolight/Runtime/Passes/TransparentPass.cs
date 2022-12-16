@@ -17,13 +17,14 @@ namespace Retrolight.Runtime.Passes {
             this.renderGraph = renderGraph;
         }
 
-        public void Run(Camera camera, CullingResults cull, TextureHandle colorTarget) {
+        public void Run(Camera camera, CullingResults cull, GBuffer gBuffer, TextureHandle colorTarget) {
             using var builder = renderGraph.AddRenderPass(
                 "Transparent Pass", 
                 out TransparentPassData passData,
                 new ProfilingSampler("Transparent Pass Profiler")
             );
             
+            gBuffer.ReadAll(builder);
             builder.UseColorBuffer(colorTarget, 0);
 
             RendererListDesc transparentRendererDesc = new RendererListDesc(TransparentPassId, cull, camera) {

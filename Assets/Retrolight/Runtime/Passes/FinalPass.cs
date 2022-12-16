@@ -34,9 +34,12 @@ namespace Retrolight.Runtime.Passes {
             /*if (passData.Camera.clearFlags == CameraClearFlags.Skybox) {
                 context.renderContext.DrawSkybox(passData.Camera);
             }*/
+            RTHandle finalColorTex = passData.FinalColorTex;
+            Vector2 scale = finalColorTex.scaleFactor;
             Blitter.BlitCameraTexture(
                 context.cmd, passData.FinalColorTex,
-                passData.CameraTarget, new Vector4(1, 1, 0, 0) //todo: pixel perfect offset bs
+                passData.CameraTarget, 
+                new Vector4(scale.x, scale.y, 0, 0) //todo: pixel perfect offset bs
             );
             context.renderContext.DrawUIOverlay(passData.Camera);
         }

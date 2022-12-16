@@ -38,18 +38,18 @@ namespace Retrolight.Runtime.Passes {
             public readonly int LightCount;
             public readonly ComputeBufferHandle LightsBuffer;
             public readonly ComputeBufferHandle CullingResultsBuffer;
-            public readonly TextureHandle FinalColor;
+            public readonly TextureHandle FinalColorTex;
 
             public LightingOut(
                 int lightCount,
                 ComputeBufferHandle lightsBuffer,
                 ComputeBufferHandle cullingResultsBuffer,
-                TextureHandle finalColor
+                TextureHandle finalColorTex
             ) {
                 LightCount = lightCount;
                 LightsBuffer = lightsBuffer;
                 CullingResultsBuffer = cullingResultsBuffer;
-                FinalColor = finalColor;
+                FinalColorTex = finalColorTex;
             }
         }
 
@@ -99,7 +99,7 @@ namespace Retrolight.Runtime.Passes {
 
             passData.GBuffer = gBuffer.ReadAll(builder);
 
-            var finalColorDesc = TextureUtility.Color(camera, "FinalColor");
+            var finalColorDesc = TextureUtility.ColorTex("FinalColorTex");
             finalColorDesc.enableRandomWrite = true;
             var finalColor = renderGraph.CreateTexture(finalColorDesc);
             finalColor = builder.WriteTexture(finalColor);
@@ -110,9 +110,7 @@ namespace Retrolight.Runtime.Passes {
                 1f / camera.pixelWidth, 1f / camera.pixelHeight
             );
 
-            builder.EnableAsyncCompute(true);
             builder.SetRenderFunc<LightingPassData>(Render);
-
             return new LightingOut(passData.LightCount, lightsBuffer, culledLightsBuffer, finalColor);
         }
 

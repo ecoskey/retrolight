@@ -10,15 +10,21 @@ namespace Retrolight.Runtime {
         
         /*public static TextureDesc Color(Camera camera, string name = "") =>
             Color(Vector2.one, GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, IsSrgb));*/
-        
-        public static TextureDesc Color(Camera camera, string name = "") =>
-            Color(camera, GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, IsSrgb), name);
 
-        public static TextureDesc Color(
-            Camera camera,
+        private const string 
+            DefaultColorTexName = "ColorTex",
+            DefaultDepthTexName = "DepthTex";
+        
+        public static TextureDesc ColorTex(string name = DefaultColorTexName) => ColorTex(Vector2.one, name);
+
+        public static TextureDesc ColorTex(Vector2 scale, string name = DefaultColorTexName) => 
+            ColorTex(scale, GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, IsSrgb), name);
+
+        public static TextureDesc ColorTex(
+            Vector2 scale,
             GraphicsFormat format, 
-            string name = ""
-        ) => new TextureDesc(camera.pixelWidth, camera.pixelHeight) {
+            string name = DefaultColorTexName
+        ) => new TextureDesc(Vector2.one) {
             colorFormat = format,
             depthBufferBits = DepthBits.None,
             clearBuffer = true,
@@ -29,9 +35,11 @@ namespace Retrolight.Runtime {
             useDynamicScale = false,
             name = name
         };
-        
-        public static TextureDesc Depth(Camera camera, string name = "") =>
-            new TextureDesc(camera.pixelWidth, camera.pixelHeight) {
+
+        public static TextureDesc DepthTex(string name = DefaultDepthTexName) => DepthTex(Vector2.one, name);
+
+        public static TextureDesc DepthTex(Vector2 scale, string name = DefaultDepthTexName) =>
+            new TextureDesc(scale) {
                 colorFormat = GraphicsFormat.None,
                 depthBufferBits = DepthBits.Depth32,
                 clearBuffer = true,
