@@ -22,11 +22,18 @@ struct ThreadInfo {
     uint2 subId : SV_GroupThreadID;
 };
 
+float3 ProcessLight(Light light, uint2 dispatchId) {
+    const float3 normal = LoadNormal(dispatchId);
+    const float brightness = saturate(dot(normal, light.Direction()));
+    return light.Color() * brightness;
+}
+
 [numthreads(8, 8, 1)]
 void Lighting(ThreadInfo input) {
     const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
-    for (int i = input.index; i < TILE_BUCKET_COUNT; i++)
-    {
+    float3 accLight = 0;
+    UNITY_LOOP
+    for (int i = input.index; i < TILE_BUCKET_COUNT; i++) {
         const uint lightsOffset = i * 32;
         uint bucket = CullingResults.Load(globalTileOffset + i);
         #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
@@ -36,9 +43,9 @@ void Lighting(ThreadInfo input) {
             const uint firstLightIndex = firstbitlow(bucket);
             ClearBit(bucket, firstLightIndex);
             const Light light = Lights[lightsOffset + firstLightIndex];
-            //ProcessLight(light, input);
+            accLight += ProcessLight(light, input.dispatchId);
         }
     }
-
-    FinalColorTex[input.dispatchId] = float4((LoadNormal(input.dispatchId) + 1) / 2, 1);
+    const float4 color = LoadAlbedo(input.dispatchId);
+    FinalColorTex[input.dispatchId] = color * float4(accLight, 1);
 }

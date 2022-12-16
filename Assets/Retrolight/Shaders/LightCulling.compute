@@ -44,7 +44,6 @@ uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip)
 
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void LightCulling(ThreadInfo input) {
-    //look into parallel reduction rather than atomics
     const float depth = LoadEyeDepth(input.dispatchId);
     #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
         const float _minDepth = WaveActiveMin(depth);

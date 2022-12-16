@@ -129,7 +129,7 @@ namespace Retrolight.Runtime.Passes {
             
             context.cmd.SetBufferData(lightBuffer, packedLights, 0, 0, passData.LightCount);
             
-            context.cmd.SetGlobalVector("Resolution", passData.Resolution);
+            context.cmd.SetGlobalVector("Resolution", passData.Resolution); //todo: move to a setup pass?
 
             //tiled light culling compute shader
             context.cmd.SetComputeIntParam(lightCullingShader, LightCountId, passData.LightCount);
