@@ -5,12 +5,19 @@ using UnityEngine.Rendering.RendererUtils;
 
 namespace Retrolight.Runtime.Passes {
     public class GBufferPass : RenderPass<GBufferPass.GBufferPassData> {
-        private static readonly ShaderTagId GBufferPassId = new ShaderTagId("RetrolightGBuffer");
+        private static readonly ShaderTagId gBufferPassId = new ShaderTagId("RetrolightGBuffer");
+
+        private const string
+            albedoTexName = "AlbedoTex",
+            depthTexName = "DepthTex",
+            normalTexName = "NormalTex",
+            attributesTexName = "AttributesTex";
+
         private static readonly int
-            AlbedoTexId = Shader.PropertyToID("AlbedoTex"),
-            DepthTexId = Shader.PropertyToID("DepthTex"),
-            NormalTexId = Shader.PropertyToID("NormalTex"),
-            AttributesTexId = Shader.PropertyToID("AttributesTex");
+            albedoTexId = Shader.PropertyToID(albedoTexName),
+            depthTexId = Shader.PropertyToID(depthTexName),
+            normalTexId = Shader.PropertyToID(normalTexName),
+            attributesTexId = Shader.PropertyToID(attributesTexName);
         
         public class GBufferPassData {
             public GBuffer GBuffer;
@@ -19,15 +26,15 @@ namespace Retrolight.Runtime.Passes {
 
         public GBufferPass(RetrolightPipeline pipeline) : base(pipeline) { }
 
-        protected override string PassName => "GBuffer Pass";
+        public override string PassName => "GBuffer Pass";
         
         public GBuffer Run() {
-            using var builder = CreatePass(out var passData);
+            using var builder = InitPass(out var passData);
             
-            TextureHandle albedo = RenderGraph.CreateTexture(TextureUtility.ColorTex("AlbedoTex"));
-            TextureHandle depth = RenderGraph.CreateTexture(TextureUtility.DepthTex());
-            TextureHandle normal = RenderGraph.CreateTexture(TextureUtility.ColorTex("NormalTex"));
-            TextureHandle attributes = RenderGraph.CreateTexture(TextureUtility.ColorTex("AttributesTex"));
+            TextureHandle albedo = CreateColorTex(albedoTexName);
+            TextureHandle depth = CreateDepthTex(depthTexName);
+            TextureHandle normal = CreateColorTex(normalTexName);
+            TextureHandle attributes = CreateColorTex(attributesTexName);
 
             GBuffer gBuffer = new GBuffer(
                 builder.UseColorBuffer(albedo, 0), 
@@ -37,11 +44,11 @@ namespace Retrolight.Runtime.Passes {
             );
             passData.GBuffer = gBuffer;
 
-            RendererListDesc gBufferRendererDesc  = new RendererListDesc(GBufferPassId, Cull, Camera) {
+            RendererListDesc gBufferRendererDesc  = new RendererListDesc(gBufferPassId, cull, camera) {
                 sortingCriteria = SortingCriteria.CommonOpaque,
                 renderQueueRange = RenderQueueRange.opaque
             };
-            RendererListHandle gBufferRendererHandle = RenderGraph.CreateRendererList(gBufferRendererDesc);
+            RendererListHandle gBufferRendererHandle = renderGraph.CreateRendererList(gBufferRendererDesc);
             passData.GBufferRendererList = builder.UseRendererList(gBufferRendererHandle);
                 
             return gBuffer;
@@ -50,10 +57,10 @@ namespace Retrolight.Runtime.Passes {
         protected override void Render(GBufferPassData passData, RenderGraphContext context) {
             CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.GBufferRendererList);
             
-            context.cmd.SetGlobalTexture(AlbedoTexId, passData.GBuffer.Albedo);
-            context.cmd.SetGlobalTexture(DepthTexId, passData.GBuffer.Depth);
-            context.cmd.SetGlobalTexture(NormalTexId, passData.GBuffer.Normal);
-            context.cmd.SetGlobalTexture(AttributesTexId, passData.GBuffer.Attributes);
+            context.cmd.SetGlobalTexture(albedoTexId, passData.GBuffer.Albedo);
+            context.cmd.SetGlobalTexture(depthTexId, passData.GBuffer.Depth);
+            context.cmd.SetGlobalTexture(normalTexId, passData.GBuffer.Normal);
+            context.cmd.SetGlobalTexture(attributesTexId, passData.GBuffer.Attributes);
         }
     }
 }

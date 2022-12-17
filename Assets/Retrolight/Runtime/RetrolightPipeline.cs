@@ -24,19 +24,19 @@ namespace Retrolight.Runtime {
         public FrameRenderData FrameData { get; private set; }
 
         //render passes
-        private GBufferPass gBufferPass;
-        private LightingPass lightingPass;
+        protected GBufferPass GBufferPass;
+        protected LightingPass LightingPass;
         //private TransparentPass transparentPass;
-        private FinalPass finalPass;
+        protected FinalPass FinalPass;
 
         public RetrolightPipeline(ShaderBundle shaderBundle, uint pixelScale) {
             RenderGraph = new RenderGraph("Retrolight Render Graph");
             ShaderBundle = shaderBundle;
 
-            gBufferPass = new GBufferPass(this);
-            lightingPass = new LightingPass(this);
+            GBufferPass = new GBufferPass(this);
+            LightingPass = new LightingPass(this);
             //transparentPass = new TransparentPass(renderGraph);
-            finalPass = new FinalPass(this);
+            FinalPass = new FinalPass(this);
             
             Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
             RTHandles.Initialize(Screen.width, Screen.height);
@@ -80,23 +80,20 @@ namespace Retrolight.Runtime {
         }
         
         protected virtual void RenderPasses() {
-            var gBuffer = gBufferPass.Run();
-            var lightingOut = lightingPass.Run(gBuffer);
+            var gBuffer = GBufferPass.Run();
+            var lightingOut = LightingPass.Run(gBuffer);
             //transparentPass.Run(camera, cull, lightingOut.FinalColor);
             //PostProcessPass -> writes to final color buffer after all other shaders
-            finalPass.Run(lightingOut.FinalColorTex); //todo: use final color buffer as input
+            FinalPass.Run(lightingOut.FinalColorTex); //todo: use final color buffer as input
         }
-
-        public override RenderPipelineGlobalSettings defaultSettings { get; }
-        protected override void ProcessRenderRequests(ScriptableRenderContext context, Camera camera, List<Camera.RenderRequest> renderRequests) { base.ProcessRenderRequests(context, camera, renderRequests); }
 
         protected sealed override void Dispose(bool disposing) {
             if (!disposing) return;
             
-            gBufferPass = null;
-            lightingPass = null;
+            GBufferPass = null;
+            LightingPass = null;
             //transparentPass = null;
-            finalPass = null;
+            FinalPass = null;
 
             Blitter.Cleanup();
             RenderGraph.Cleanup();

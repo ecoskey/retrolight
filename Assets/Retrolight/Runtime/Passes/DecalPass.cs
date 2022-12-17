@@ -1,28 +1,21 @@
-using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
 
 namespace Retrolight.Runtime.Passes {
-    public class DecalPass {
-        private static readonly ShaderTagId DecalPassId = new ShaderTagId("RetrolightDecal");
+    public class DecalPass : RenderPass<DecalPass.DecalPassData> {
+        private static readonly ShaderTagId decalPassId = new ShaderTagId("RetrolightDecal");
         
-        private readonly RenderGraph renderGraph;
-        
-        class DecalPassData {
+        public class DecalPassData {
             public RendererListHandle DecalRendererList;
         }
-
-        public DecalPass(RenderGraph renderGraph) {
-            this.renderGraph = renderGraph;
-        }
-
-        public void Run(Camera camera, CullingResults cull, GBuffer gBuffer) {
-            using var builder = renderGraph.AddRenderPass(
-                "Decal Pass", 
-                out DecalPassData passData,
-                new ProfilingSampler("Decal Pass Profiler")
-            );
+        
+        public DecalPass(RetrolightPipeline pipeline) : base(pipeline) { }
+        
+        public override string PassName => "Decal Pass";
+        
+        public void Run(GBuffer gBuffer) {
+            using var builder = InitPass(out var passData);
             
             gBuffer.ReadAll(builder);
             builder.UseColorBuffer(gBuffer.Albedo, 0);
@@ -30,7 +23,7 @@ namespace Retrolight.Runtime.Passes {
             builder.UseColorBuffer(gBuffer.Normal, 1);
             builder.UseColorBuffer(gBuffer.Attributes, 2);
 
-            RendererListDesc transparentRendererDesc = new RendererListDesc(DecalPassId, cull, camera) {
+            RendererListDesc transparentRendererDesc = new RendererListDesc(decalPassId, cull, camera) {
                 sortingCriteria = SortingCriteria.CommonTransparent,
                 renderQueueRange = RenderQueueRange.transparent
             };
@@ -39,8 +32,8 @@ namespace Retrolight.Runtime.Passes {
             builder.AllowRendererListCulling(true);
             builder.SetRenderFunc<DecalPassData>(Render);
         }
-
-        private void Render(DecalPassData passData, RenderGraphContext context) {
+        
+        protected override void Render(DecalPassData passData, RenderGraphContext context) {
             context.cmd.DrawRendererList(passData.DecalRendererList);
         }
     }

@@ -6,12 +6,12 @@ using UnityEngine.Rendering;
 
 namespace Retrolight.Runtime.Passes {
     public class LightingPass : RenderPass<LightingPass.LightingPassData> {
-        private const int MaximumLights = 1024;
+        private const int maximumLights = 1024;
         private static readonly int
-            LightCountId = Shader.PropertyToID("LightCount"),
-            LightBufferId = Shader.PropertyToID("Lights"),
-            CullingResultsId = Shader.PropertyToID("CullingResults"),
-            FinalColorTexId = Shader.PropertyToID("FinalColorTex");
+            lightCountId = Shader.PropertyToID("LightCount"),
+            lightBufferId = Shader.PropertyToID("Lights"),
+            cullingResultsId = Shader.PropertyToID("CullingResults"),
+            finalColorTexId = Shader.PropertyToID("FinalColorTex");
 
         private readonly int lightCullingKernelId, lightingKernelId;
 
@@ -47,41 +47,41 @@ namespace Retrolight.Runtime.Passes {
         }
         
         public LightingPass(RetrolightPipeline pipeline) : base(pipeline) {
-            lightCullingKernelId = ShaderBundle.LightCullingShader.FindKernel("LightCulling");
-            lightingKernelId = ShaderBundle.LightingShader.FindKernel("Lighting");
+            lightCullingKernelId = shaderBundle.LightCullingShader.FindKernel("LightCulling");
+            lightingKernelId = shaderBundle.LightingShader.FindKernel("Lighting");
         }
         
-        protected override string PassName => "Lighting Pass";
+        public override string PassName => "Lighting Pass";
         
         public LightingOut Run(GBuffer gBuffer) {
-            using var builder = CreatePass(out var passData);
+            using var builder = InitPass(out var passData);
             
-            passData.Lights = Cull.visibleLights;
-            int lightCount = Math.Min(passData.Lights.Length, MaximumLights);
+            passData.Lights = cull.visibleLights;
+            int lightCount = Math.Min(passData.Lights.Length, maximumLights);
             passData.LightCount = lightCount;
                 
             Vector2Int tileCount = new Vector2Int(
-                Mathf.CeilToInt(Camera.pixelWidth / 8f),
-                Mathf.CeilToInt(Camera.pixelHeight / 8f)
+                Mathf.CeilToInt(camera.pixelWidth / 8f),
+                Mathf.CeilToInt(camera.pixelHeight / 8f)
             );
             passData.TileCount = tileCount;
 
-            var lightsDesc = new ComputeBufferDesc(MaximumLights, PackedLight.Stride) {
+            var lightsDesc = new ComputeBufferDesc(maximumLights, PackedLight.Stride) {
                 name = "Lights",
                 type = ComputeBufferType.Structured
             };
-            var lightsBuffer = RenderGraph.CreateComputeBuffer(lightsDesc);
+            var lightsBuffer = renderGraph.CreateComputeBuffer(lightsDesc);
             lightsBuffer = builder.WriteComputeBuffer(lightsBuffer);
             passData.LightBuffer = lightsBuffer;
                 
             var culledLightsDesc = new ComputeBufferDesc(
-                Mathf.CeilToInt(MaximumLights / 32f) * tileCount.x * tileCount.y, 
+                Mathf.CeilToInt(maximumLights / 32f) * tileCount.x * tileCount.y, 
                 sizeof(uint)
             ) {
                 name = "CulledLights", 
                 type = ComputeBufferType.Raw,
             };
-            var culledLightsBuffer = RenderGraph.CreateComputeBuffer(culledLightsDesc);
+            var culledLightsBuffer = renderGraph.CreateComputeBuffer(culledLightsDesc);
             culledLightsBuffer = builder.WriteComputeBuffer(culledLightsBuffer);
             passData.CullingResultsBuffer = culledLightsBuffer;
 
@@ -89,28 +89,29 @@ namespace Retrolight.Runtime.Passes {
 
             var finalColorDesc = TextureUtility.ColorTex("FinalColorTex");
             finalColorDesc.enableRandomWrite = true;
-            var finalColor = RenderGraph.CreateTexture(finalColorDesc);
+            var finalColor = renderGraph.CreateTexture(finalColorDesc);
             finalColor = builder.WriteTexture(finalColor);
             passData.FinalColorTex = finalColor;
 
+            //todo: setup resolution, shader properties in a different SetupPass?
             passData.Resolution = new Vector4(
-                Camera.pixelWidth, Camera.pixelHeight, 
-                1f / Camera.pixelWidth, 1f / Camera.pixelHeight
+                camera.pixelWidth, camera.pixelHeight, 
+                1f / camera.pixelWidth, 1f / camera.pixelHeight
             );
 
             builder.SetRenderFunc<LightingPassData>(Render);
             return new LightingOut(passData.LightCount, lightsBuffer, culledLightsBuffer, finalColor);
         }
-
+        
         protected override void Render(LightingPassData passData, RenderGraphContext context) {
             NativeArray<VisibleLight> lights = passData.Lights;
-            ComputeShader lightCullingShader = ShaderBundle.LightCullingShader;
-            ComputeShader lightingShader = ShaderBundle.LightingShader;
+            ComputeShader lightCullingShader = shaderBundle.LightCullingShader;
+            ComputeShader lightingShader = shaderBundle.LightingShader;
             ComputeBuffer lightBuffer = passData.LightBuffer;
             ComputeBuffer cullingResultsBuffer = passData.CullingResultsBuffer;
 
             NativeArray<PackedLight> packedLights = new NativeArray<PackedLight>( //todo: this is a lot of allocation/deallocation each frame
-                MaximumLights, Allocator.Temp,
+                maximumLights, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory
             );
             for (int i = 0; i < passData.LightCount; i++) {
@@ -122,12 +123,12 @@ namespace Retrolight.Runtime.Passes {
             context.cmd.SetGlobalVector("Resolution", passData.Resolution); //todo: move to a setup pass?
 
             //tiled light culling compute shader
-            context.cmd.SetComputeIntParam(lightCullingShader, LightCountId, passData.LightCount);
+            context.cmd.SetComputeIntParam(lightCullingShader, lightCountId, passData.LightCount);
             context.cmd.SetComputeBufferParam(
-                lightCullingShader, lightCullingKernelId, LightBufferId, lightBuffer
+                lightCullingShader, lightCullingKernelId, lightBufferId, lightBuffer
             );
             context.cmd.SetComputeBufferParam(
-                lightCullingShader, lightCullingKernelId, CullingResultsId, cullingResultsBuffer
+                lightCullingShader, lightCullingKernelId, cullingResultsId, cullingResultsBuffer
             );
             context.cmd.DispatchCompute(
                 lightCullingShader, lightCullingKernelId, 
@@ -135,15 +136,15 @@ namespace Retrolight.Runtime.Passes {
             );
 
             //lighting calculation compute shader
-            context.cmd.SetComputeIntParam(lightCullingShader, LightCountId, passData.LightCount);
+            context.cmd.SetComputeIntParam(lightCullingShader, lightCountId, passData.LightCount);
             context.cmd.SetComputeBufferParam(
-                lightingShader, lightingKernelId, LightBufferId, lightBuffer
+                lightingShader, lightingKernelId, lightBufferId, lightBuffer
             );
             context.cmd.SetComputeBufferParam(
-                lightingShader, lightingKernelId, CullingResultsId, cullingResultsBuffer
+                lightingShader, lightingKernelId, cullingResultsId, cullingResultsBuffer
             );
             context.cmd.SetComputeTextureParam(
-                lightingShader, lightingKernelId, FinalColorTexId, passData.FinalColorTex
+                lightingShader, lightingKernelId, finalColorTexId, passData.FinalColorTex
             );
             context.cmd.DispatchCompute(
                 lightingShader, lightingKernelId, 

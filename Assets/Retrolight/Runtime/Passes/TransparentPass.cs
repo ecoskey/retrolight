@@ -4,7 +4,7 @@ using UnityEngine.Rendering.RendererUtils;
 
 namespace Retrolight.Runtime.Passes {
     public class TransparentPass : RenderPass<TransparentPass.TransparentPassData> {
-        private static readonly ShaderTagId TransparentPassId = new ShaderTagId("RetrolightTransparent");
+        private static readonly ShaderTagId transparentPass = new ShaderTagId("RetrolightTransparent");
         
         public class TransparentPassData {
             public RendererListHandle TransparentRendererList;
@@ -12,19 +12,19 @@ namespace Retrolight.Runtime.Passes {
         
         public TransparentPass(RetrolightPipeline pipeline) : base(pipeline) { }
 
-        protected override string PassName => "Transparent Pass";
+        public override string PassName => "Transparent Pass";
 
         public void Run(GBuffer gBuffer, TextureHandle colorTarget) {
-            using var builder = CreatePass(out var passData);
+            using var builder = InitPass(out var passData);
             
             gBuffer.ReadAll(builder);
             builder.UseColorBuffer(colorTarget, 0);
 
-            RendererListDesc transparentRendererDesc = new RendererListDesc(TransparentPassId, Cull, Camera) {
+            RendererListDesc transparentRendererDesc = new RendererListDesc(transparentPass, cull, camera) {
                 sortingCriteria = SortingCriteria.CommonTransparent,
                 renderQueueRange = RenderQueueRange.transparent
             };
-            passData.TransparentRendererList = RenderGraph.CreateRendererList(transparentRendererDesc);
+            passData.TransparentRendererList = renderGraph.CreateRendererList(transparentRendererDesc);
             
             builder.AllowRendererListCulling(true);
             builder.SetRenderFunc<TransparentPassData>(Render);
