@@ -8,23 +8,23 @@ namespace Retrolight.Runtime.Passes {
             public TextureHandle FinalColorTex;
             public TextureHandle CameraTarget;
         }
-        
-        public FinalPass(RetrolightPipeline pipeline) : base(pipeline) { }
-        
+
+        public FinalPass(Retrolight pipeline) : base(pipeline) { }
+
         public override string PassName => "Final Pass";
 
         public void Run(TextureHandle finalColor) {
             using var builder = InitPass(out var passData);
-            
+
             passData.FinalColorTex = builder.ReadTexture(finalColor);
             TextureHandle cameraTarget = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CameraTarget);
             passData.CameraTarget = builder.WriteTexture(cameraTarget);
         }
-        
+
         protected override void Render(FinalPassData passData, RenderGraphContext context) {
             Vector2 scale = rtHandleProperties.rtHandleScale;
             Blitter.BlitCameraTexture(
-                context.cmd, passData.FinalColorTex, passData.CameraTarget, 
+                context.cmd, passData.FinalColorTex, passData.CameraTarget,
                 new Vector4(scale.x, scale.y, 0, 0) //todo: pixel perfect offset bs
             );
         }

@@ -5,7 +5,14 @@
 
 #define TILE_SIZE 8 // tiles are 8x8
 
-int4 UVToTile(float2 uv) {
+CBUFFER_START(TilingData)
+uint2 TileCount;
+uint2 PixelResolution;
+float4 Resolution;
+CBUFFER_END
+
+int4 UVToTile(float2 uv)
+{
     int2 pixelPos = uv * PixelResolution.xy;
     int4 result;
     result.xy = pixelPos / TILE_SIZE;
@@ -13,7 +20,8 @@ int4 UVToTile(float2 uv) {
     return result;
 }
 
-uint TileIndex(uint2 groupId) {
+uint TileIndex(uint2 groupId)
+{
     return groupId.y * TileCount.x + groupId.x;
 }
 

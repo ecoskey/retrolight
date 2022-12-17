@@ -4,7 +4,9 @@ namespace Retrolight.Runtime {
     public struct GBuffer {
         public readonly TextureHandle Albedo;
         public readonly TextureHandle Depth;
+
         public readonly TextureHandle Normal;
+
         //public readonly TextureHandle Emission;
         public readonly TextureHandle Attributes;
 

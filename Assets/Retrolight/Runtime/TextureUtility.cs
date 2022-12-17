@@ -7,28 +7,28 @@ using UColor = UnityEngine.Color;
 namespace Retrolight.Runtime {
     public static class TextureUtility {
         public static bool IsSrgb => QualitySettings.activeColorSpace == ColorSpace.Gamma;
-        
+
         /*public static TextureDesc Color(Camera camera, string name = "") =>
             Color(Vector2.one, GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, IsSrgb));*/
 
-        public const string 
+        public const string
             DefaultColorTexName = "ColorTex",
             DefaultDepthTexName = "DepthTex";
 
         public static TextureDesc ColorTex(string name = DefaultColorTexName) => ColorTex(Vector2.one, name);
 
-        public static TextureDesc ColorTex(Vector2 scale, string name = DefaultColorTexName) => 
+        public static TextureDesc ColorTex(Vector2 scale, string name = DefaultColorTexName) =>
             ColorTex(scale, GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, IsSrgb), name);
 
         public static TextureDesc ColorTex(
-            Vector2 scale, GraphicsFormat format, 
+            Vector2 scale, GraphicsFormat format,
             string name = DefaultColorTexName
         ) => new TextureDesc(Vector2.one) {
             colorFormat = format,
             depthBufferBits = DepthBits.None,
             clearBuffer = true,
             clearColor = UColor.clear,
-            enableRandomWrite = false, 
+            enableRandomWrite = false,
             filterMode = FilterMode.Point,
             msaaSamples = MSAASamples.None,
             useDynamicScale = false,

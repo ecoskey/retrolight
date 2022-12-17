@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Retrolight.Runtime.Passes {
     public abstract class RenderPass<T> where T : class, new() {
-        private readonly RetrolightPipeline pipeline;
+        private readonly Retrolight pipeline;
 
         protected RenderGraph renderGraph => pipeline.RenderGraph;
         protected ShaderBundle shaderBundle => pipeline.ShaderBundle;
@@ -13,14 +13,16 @@ namespace Retrolight.Runtime.Passes {
         protected CullingResults cull => pipeline.FrameData.Cull;
         protected RTHandleProperties rtHandleProperties => pipeline.FrameData.RTHandleProperties;
 
-        protected RenderPass(RetrolightPipeline pipeline) { this.pipeline = pipeline; }
-        
+        protected RenderPass(Retrolight pipeline) {
+            this.pipeline = pipeline;
+        }
+
         public abstract string PassName { get; }
         protected abstract void Render(T passData, RenderGraphContext context);
 
         protected RenderGraphBuilder InitPass(out T passData) {
             var builder = renderGraph.AddRenderPass(
-                PassName, out passData, 
+                PassName, out passData,
                 new ProfilingSampler(PassName + " Profiler")
             );
             builder.SetRenderFunc<T>(Render);
@@ -34,18 +36,18 @@ namespace Retrolight.Runtime.Passes {
             renderGraph.CreateTexture(TextureUtility.ColorTex(scale, name));
 
         protected TextureHandle CreateColorTex(
-            Vector2 scale, GraphicsFormat format, 
+            Vector2 scale, GraphicsFormat format,
             string name = TextureUtility.DefaultColorTexName
         ) => renderGraph.CreateTexture(TextureUtility.ColorTex(scale, format, name));
 
         protected TextureHandle CreateWriteColorTex(
-            RenderGraphBuilder builder, 
+            RenderGraphBuilder builder,
             string name = TextureUtility.DefaultColorTexName
         ) => builder.WriteTexture(CreateColorTex(name));
 
 
         protected TextureHandle CreateWriteColorTex(
-            RenderGraphBuilder builder, Vector2 scale, 
+            RenderGraphBuilder builder, Vector2 scale,
             string name = TextureUtility.DefaultColorTexName
         ) => builder.WriteTexture(CreateColorTex(scale, name));
 
@@ -53,6 +55,9 @@ namespace Retrolight.Runtime.Passes {
             RenderGraphBuilder builder, Vector2 scale, GraphicsFormat format,
             string name = TextureUtility.DefaultColorTexName
         ) => builder.WriteTexture(CreateColorTex(scale, format, name));
+
+        protected TextureHandle CreateWriteColorTex(RenderGraphBuilder builder, TextureDesc desc) =>
+            builder.WriteTexture(renderGraph.CreateTexture(desc));
 
         protected TextureHandle CreateUseColorBuffer(
             RenderGraphBuilder builder, int index,
@@ -91,8 +96,11 @@ namespace Retrolight.Runtime.Passes {
         ) => builder.UseDepthBuffer(CreateDepthTex(name), access);
 
         protected TextureHandle CreateUseDepthBuffer(
-            RenderGraphBuilder builder, DepthAccess access, Vector2 scale, 
+            RenderGraphBuilder builder, DepthAccess access, Vector2 scale,
             string name = TextureUtility.DefaultDepthTexName
         ) => builder.UseDepthBuffer(CreateDepthTex(scale, name), access);
+
+        protected ComputeBufferHandle CreateWriteComputeBuffer(RenderGraphBuilder builder, ComputeBufferDesc desc) =>
+            builder.WriteComputeBuffer(renderGraph.CreateComputeBuffer(desc));
     }
 }

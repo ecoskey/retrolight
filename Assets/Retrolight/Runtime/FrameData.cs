@@ -12,6 +12,5 @@ namespace Retrolight.Runtime {
             Cull = cull;
             RTHandleProperties = rtHandleProperties;
         }
-        
     }
 }

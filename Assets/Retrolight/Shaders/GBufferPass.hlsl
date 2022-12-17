@@ -9,19 +9,20 @@ SAMPLER(sampler_MainTex);
 TEXTURE2D(_NormalMap);
 
 UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
-    UNITY_DEFINE_INSTANCED_PROP(float4, _MainColor)
-    UNITY_DEFINE_INSTANCED_PROP(float4, _MainTex_ST)
-    UNITY_DEFINE_INSTANCED_PROP(float, _NormalScale)
-    UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
-    UNITY_DEFINE_INSTANCED_PROP(float, _Metallic)
-    UNITY_DEFINE_INSTANCED_PROP(float, _Smoothness)
-    UNITY_DEFINE_INSTANCED_PROP(float, _DepthEdgeStrength)
-    UNITY_DEFINE_INSTANCED_PROP(float, _NormalEdgeStrength)
+UNITY_DEFINE_INSTANCED_PROP(float4, _MainColor)
+UNITY_DEFINE_INSTANCED_PROP(float4, _MainTex_ST)
+UNITY_DEFINE_INSTANCED_PROP(float, _NormalScale)
+UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
+UNITY_DEFINE_INSTANCED_PROP(float, _Metallic)
+UNITY_DEFINE_INSTANCED_PROP(float, _Smoothness)
+UNITY_DEFINE_INSTANCED_PROP(float, _DepthEdgeStrength)
+UNITY_DEFINE_INSTANCED_PROP(float, _NormalEdgeStrength)
 UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 #define INPUT_PROP(prop) UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, prop)
 
-struct VertexInput {
+struct VertexInput
+{
     float3 positionOS : POSITION;
     float3 normalOS : NORMAL;
     float4 tangentOS : TANGENT;
@@ -29,7 +30,8 @@ struct VertexInput {
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-struct V2F {
+struct V2F
+{
     float4 positionCS : SV_Position;
     float3 normalWS : V2F_Normal;
     float4 tangentWS : V2F_Tangent;
@@ -37,20 +39,23 @@ struct V2F {
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-struct GBufferOut {
+struct GBufferOut
+{
     float4 albedo : SV_Target0;
     float4 normal : SV_Target1;
     float4 attributes : SV_Target2;
 };
 
-float3 GetNormalTS(float2 baseUV) {
+float3 GetNormalTS(float2 baseUV)
+{
     float4 map = SAMPLE_TEXTURE2D(_NormalMap, sampler_MainTex, baseUV);
     float scale = INPUT_PROP(_NormalScale);
     float3 normal = DecodeNormal(map, scale);
     return normal;
 }
 
-V2F GBufferVertex(VertexInput input) {
+V2F GBufferVertex(VertexInput input)
+{
     V2F output;
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_TRANSFER_INSTANCE_ID(input, output);
@@ -62,7 +67,8 @@ V2F GBufferVertex(VertexInput input) {
     return output;
 }
 
-GBufferOut GBufferFragment(V2F input) {
+GBufferOut GBufferFragment(V2F input)
+{
     UNITY_SETUP_INSTANCE_ID(input);
     GBufferOut output;
     float4 baseMap = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
@@ -74,14 +80,14 @@ GBufferOut GBufferFragment(V2F input) {
     float3 normal = NormalTangentToWorld(GetNormalTS(input.uv), input.normalWS, input.tangentWS);
     float3 normNorm = normalize(normal);
     output.normal = float4((normNorm + 1) / 2, 1);
-    
+
     output.attributes = float4(
         INPUT_PROP(_Metallic),
         INPUT_PROP(_Smoothness),
         INPUT_PROP(_DepthEdgeStrength),
         INPUT_PROP(_NormalEdgeStrength)
     );
-    
+
     return output;
 }
 

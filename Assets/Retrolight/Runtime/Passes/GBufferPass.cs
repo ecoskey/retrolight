@@ -18,34 +18,34 @@ namespace Retrolight.Runtime.Passes {
             depthTexId = Shader.PropertyToID(depthTexName),
             normalTexId = Shader.PropertyToID(normalTexName),
             attributesTexId = Shader.PropertyToID(attributesTexName);
-        
+
         public class GBufferPassData {
             public GBuffer GBuffer;
             public RendererListHandle GBufferRendererList;
         }
 
-        public GBufferPass(RetrolightPipeline pipeline) : base(pipeline) { }
+        public GBufferPass(Retrolight pipeline) : base(pipeline) { }
 
         public override string PassName => "GBuffer Pass";
-        
+
         public GBuffer Run() {
             using var builder = InitPass(out var passData);
-            
+
             GBuffer gBuffer = new GBuffer(
-                CreateUseColorBuffer(builder, 0, albedoTexName), 
-                CreateUseDepthBuffer(builder, DepthAccess.Write, depthTexName), 
+                CreateUseColorBuffer(builder, 0, albedoTexName),
+                CreateUseDepthBuffer(builder, DepthAccess.Write, depthTexName),
                 CreateUseColorBuffer(builder, 1, normalTexName),
                 CreateUseColorBuffer(builder, 2, attributesTexName)
             );
             passData.GBuffer = gBuffer;
 
-            RendererListDesc gBufferRendererDesc  = new RendererListDesc(gBufferPassId, cull, camera) {
+            RendererListDesc gBufferRendererDesc = new RendererListDesc(gBufferPassId, cull, camera) {
                 sortingCriteria = SortingCriteria.CommonOpaque,
                 renderQueueRange = RenderQueueRange.opaque
             };
             RendererListHandle gBufferRendererHandle = renderGraph.CreateRendererList(gBufferRendererDesc);
             passData.GBufferRendererList = builder.UseRendererList(gBufferRendererHandle);
-                
+
             return gBuffer;
         }
 

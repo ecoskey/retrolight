@@ -11,21 +11,25 @@
 #define LINE_LIGHT 3
 
 //todo: look into utilities in Core RP lib Packing.hlsl 
-struct Light {
+struct Light
+{
     float3 position;
     uint type16_range16; //flags are currently unused, possibly layer mask?
     uint2 color48_extra16; //packed half3 color and half precision extra float
     uint2 direction; //unused half of y component
 
-    uint Type() {
+    uint Type()
+    {
         return type16_range16 & 0xFF;
     }
 
-    float Range() {
+    float Range()
+    {
         return f16tof32(type16_range16 >> 16);
     }
 
-    float3 Color() {
+    float3 Color()
+    {
         return float3(
             f16tof32(color48_extra16.x),
             f16tof32(color48_extra16.x >> 16),
@@ -33,11 +37,13 @@ struct Light {
         );
     }
 
-    float Extra() {
+    float Extra()
+    {
         return f16tof32(color48_extra16.y >> 16);
     }
 
-    float3 Direction() {
+    float3 Direction()
+    {
         return float3(
             f16tof32(direction.x),
             f16tof32(direction.x >> 16),
@@ -46,7 +52,8 @@ struct Light {
     }
 };
 
-Light DirectionalLight(float3 color, float3 direction) {
+Light DirectionalLight(float3 color, float3 direction)
+{
     Light light;
     light.position = 0;
     light.type16_range16 = DIRECTIONAL_LIGHT;
@@ -55,7 +62,8 @@ Light DirectionalLight(float3 color, float3 direction) {
     return light;
 }
 
-Light PointLight(float3 position, float3 color, float range) {
+Light PointLight(float3 position, float3 color, float range)
+{
     Light light;
     light.position = position;
     light.type16_range16 = POINT_LIGHT | f32tof16(range) << 16;
@@ -64,7 +72,8 @@ Light PointLight(float3 position, float3 color, float range) {
     return light;
 }
 
-Light LineLight(float3 a, float3 b, float3 color, float range) {
+Light LineLight(float3 a, float3 b, float3 color, float range)
+{
     Light light;
     light.position = a;
     float3 delta = b - a;

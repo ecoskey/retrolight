@@ -18,20 +18,23 @@ groupshared uint uMinDepth = 0xFFFFFFFF;
 groupshared uint uMaxDepth = 0;
 groupshared uint depthMask = 0;
 
-struct ThreadInfo {
+struct ThreadInfo
+{
     uint2 id : SV_GroupID;
     uint index : SV_GroupIndex;
     uint2 dispatchId : SV_DispatchThreadID;
     uint2 subId : SV_GroupThreadID;
 };
 
-void AllowLight(uint index) {
+void AllowLight(uint index)
+{
     uint bucketIndex = index / BUCKET_SIZE;
     uint bitIndex = index % BUCKET_SIZE;
     InterlockedOr(tile[bucketIndex], 1 << bitIndex);
 }
 
-uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip) {
+uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip)
+{
     const float minDepth = screenVolume.pos.z - screenVolume.r;
     const float maxDepth = screenVolume.pos.z + screenVolume.r;
     const uint minIndex = clamp(0, BUCKET_SIZE - 1, floor((minDepth - fMinDepth) * depthRangeRecip));
@@ -43,7 +46,8 @@ uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip)
 }
 
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
-void LightCulling(ThreadInfo input) {
+void LightCulling(ThreadInfo input)
+{
     const float depth = LoadEyeDepth(input.dispatchId);
     #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
         const float _minDepth = WaveActiveMin(depth);
@@ -53,8 +57,8 @@ void LightCulling(ThreadInfo input) {
             InterlockedMax(uMaxDepth, asuint(_maxDepth));
         }
     #else
-        InterlockedMin(uMinDepth, asuint(depth));
-        InterlockedMax(uMaxDepth, asuint(depth));
+    InterlockedMin(uMinDepth, asuint(depth));
+    InterlockedMax(uMaxDepth, asuint(depth));
     #endif
     GroupMemoryBarrierWithGroupSync();
 
@@ -65,7 +69,7 @@ void LightCulling(ThreadInfo input) {
     const float fMinDepth = asfloat(uMinDepth);
     const float fMaxDepth = asfloat(uMaxDepth);
     #endif
-    
+
     const float depthRangeRecip = float(BUCKET_SIZE) / (fMaxDepth - fMinDepth);
     const uint depthMaskIndex = clamp(floor((depth - fMinDepth) * depthRangeRecip), 0, BUCKET_SIZE - 1);
     uint partialDepthMask = 1 << depthMaskIndex;
@@ -75,14 +79,15 @@ void LightCulling(ThreadInfo input) {
             InterlockedOr(depthMask, partialDepthMask);
         }
     #else
-        InterlockedOr(depthMask, partialDepthMask);
+    InterlockedOr(depthMask, partialDepthMask);
     #endif
-    
+
     uint i;
 
     UNITY_UNROLL
-    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
-        tile[i] = 0; 
+    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE)
+    {
+        tile[i] = 0;
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -93,24 +98,26 @@ void LightCulling(ThreadInfo input) {
     float2 minUv = 0;
     float2 maxUv = 1;
     const AABB tileVolume = OrthoVolumeFromUVDepth(minUv, maxUv, fMinDepth, fMaxDepth);
-    
+
     UNITY_LOOP
-    for (i = input.index; i < MAX_LIGHTS; i += TILE_SIZE * TILE_SIZE) {
+    for (i = input.index; i < MAX_LIGHTS; i += TILE_SIZE * TILE_SIZE)
+    {
         Light light = Lights[i];
-        switch(light.Type()) {
-            case DIRECTIONAL_LIGHT:
-                AllowLight(i);
-                break;
-            case POINT_LIGHT:
-                Sphere volume = PointLightCullVolume(light);
-                TransformSphereToView(volume);
-                if (!SphereIntersectsAABB(volume, tileVolume)) break; //todo: test culling against camera frustum/aabb
-                uint lightDepthMask = PointLightMask(volume, fMinDepth, depthRangeRecip);
-                if (lightDepthMask & depthMask) AllowLight(i);
-                break;
-            case SPOT_LIGHT: break;
-            case LINE_LIGHT: break;
-            default: break;
+        switch (light.Type())
+        {
+        case DIRECTIONAL_LIGHT:
+            AllowLight(i);
+            break;
+        case POINT_LIGHT:
+            Sphere volume = PointLightCullVolume(light);
+            TransformSphereToView(volume);
+            if (!SphereIntersectsAABB(volume, tileVolume)) break; //todo: test culling against camera frustum/aabb
+            uint lightDepthMask = PointLightMask(volume, fMinDepth, depthRangeRecip);
+            if (lightDepthMask & depthMask) AllowLight(i);
+            break;
+        case SPOT_LIGHT: break;
+        case LINE_LIGHT: break;
+        default: break;
         }
     }
 
@@ -118,7 +125,8 @@ void LightCulling(ThreadInfo input) {
 
     const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
     UNITY_UNROLL
-    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
+    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE)
+    {
         CullingResults.Store(globalTileOffset + i, tile[i]);
     }
 }

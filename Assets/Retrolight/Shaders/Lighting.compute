@@ -15,21 +15,24 @@ ByteAddressBuffer CullingResults;
 
 RW_TEXTURE2D(float4, FinalColorTex);
 
-struct ThreadInfo {
+struct ThreadInfo
+{
     uint2 id : SV_GroupID;
     uint index : SV_GroupIndex;
     uint2 dispatchId : SV_DispatchThreadID;
     uint2 subId : SV_GroupThreadID;
 };
 
-float3 ProcessLight(Light light, uint2 dispatchId) {
+float3 ProcessLight(Light light, uint2 dispatchId)
+{
     const float3 normal = LoadNormal(dispatchId);
     const float brightness = saturate(dot(normal, light.Direction()));
     return light.Color() * brightness;
 }
 
 [numthreads(8, 8, 1)]
-void Lighting(ThreadInfo input) {
+void Lighting(ThreadInfo input)
+{
     //const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
     //float3 accLight = 0;
     /*UNITY_LOOP

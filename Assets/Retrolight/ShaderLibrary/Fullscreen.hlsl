@@ -7,12 +7,14 @@
 
 #include "Common.hlsl"
 
-struct V2F {
+struct V2F
+{
     float4 positionCS : SV_Position;
     float2 uv : V2F_UV;
 };
 
-V2F FullscreenVertex(uint vertexId : VERTEXID_SEMANTIC) {
+V2F FullscreenVertex(uint vertexId : VERTEXID_SEMANTIC)
+{
     V2F output;
     output.positionCS = GetFullScreenTriangleVertexPosition(vertexId);
     output.uv = GetFullScreenTriangleTexCoord(vertexId) * FULLSCREEN_ST.xy + FULLSCREEN_ST.zw;
@@ -22,4 +24,5 @@ V2F FullscreenVertex(uint vertexId : VERTEXID_SEMANTIC) {
     #endif
     return output;
 }
+
 #endif
