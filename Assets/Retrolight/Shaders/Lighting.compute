@@ -30,9 +30,9 @@ float3 ProcessLight(Light light, uint2 dispatchId) {
 
 [numthreads(8, 8, 1)]
 void Lighting(ThreadInfo input) {
-    const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
-    float3 accLight = 0;
-    UNITY_LOOP
+    //const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
+    //float3 accLight = 0;
+    /*UNITY_LOOP
     for (int i = input.index; i < TILE_BUCKET_COUNT; i++) {
         const uint lightsOffset = i * 32;
         uint bucket = CullingResults.Load(globalTileOffset + i);
@@ -45,7 +45,8 @@ void Lighting(ThreadInfo input) {
             const Light light = Lights[lightsOffset + firstLightIndex];
             accLight += ProcessLight(light, input.dispatchId);
         }
-    }
+    }*/
     const float4 color = LoadAlbedo(input.dispatchId);
-    FinalColorTex[input.dispatchId] = color * float4(accLight, 1);
+    const float3 normal = LoadNormal(input.dispatchId);
+    FinalColorTex[input.dispatchId] = color * saturate(dot(normal, float3(1, 1, 1)));
 }

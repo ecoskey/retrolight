@@ -1,43 +1,36 @@
-using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
 
 namespace Retrolight.Runtime.Passes {
-    public class TransparentPass {
+    public class TransparentPass : RenderPass<TransparentPass.TransparentPassData> {
         private static readonly ShaderTagId TransparentPassId = new ShaderTagId("RetrolightTransparent");
         
-        private readonly RenderGraph renderGraph;
-        
-        class TransparentPassData {
+        public class TransparentPassData {
             public RendererListHandle TransparentRendererList;
         }
+        
+        public TransparentPass(RetrolightPipeline pipeline) : base(pipeline) { }
 
-        public TransparentPass(RenderGraph renderGraph) {
-            this.renderGraph = renderGraph;
-        }
+        protected override string PassName => "Transparent Pass";
 
-        public void Run(Camera camera, CullingResults cull, GBuffer gBuffer, TextureHandle colorTarget) {
-            using var builder = renderGraph.AddRenderPass(
-                "Transparent Pass", 
-                out TransparentPassData passData,
-                new ProfilingSampler("Transparent Pass Profiler")
-            );
+        public void Run(GBuffer gBuffer, TextureHandle colorTarget) {
+            using var builder = CreatePass(out var passData);
             
             gBuffer.ReadAll(builder);
             builder.UseColorBuffer(colorTarget, 0);
 
-            RendererListDesc transparentRendererDesc = new RendererListDesc(TransparentPassId, cull, camera) {
+            RendererListDesc transparentRendererDesc = new RendererListDesc(TransparentPassId, Cull, Camera) {
                 sortingCriteria = SortingCriteria.CommonTransparent,
                 renderQueueRange = RenderQueueRange.transparent
             };
-            passData.TransparentRendererList = renderGraph.CreateRendererList(transparentRendererDesc);
+            passData.TransparentRendererList = RenderGraph.CreateRendererList(transparentRendererDesc);
             
             builder.AllowRendererListCulling(true);
             builder.SetRenderFunc<TransparentPassData>(Render);
         }
-
-        private void Render(TransparentPassData passData, RenderGraphContext context) {
+        
+        protected override void Render(TransparentPassData passData, RenderGraphContext context) {
             context.cmd.DrawRendererList(passData.TransparentRendererList);
         }
     }

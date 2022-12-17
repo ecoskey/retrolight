@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2bba273bac5e41b3b1c0cf82399797dd, type: 3}
   m_Name: Retrolight Shader Bundle
   m_EditorClassIdentifier: 
-  lightCullShader: {fileID: 7200000, guid: 86dded576698b4c2c9296bf77056e8b1, type: 3}
-  lightingShader: {fileID: 7200000, guid: 46146151f79441d79b24c0d69438b288, type: 3}
-  blitShader: {fileID: 4800000, guid: 1f3a2c4a65254c7e87fce0ea2d2dde48, type: 3}
-  blitWithDepthShader: {fileID: 4800000, guid: 1fdb84711ca540ce8230532fa1ccb19e, type: 3}
+  lightCullingShader: {fileID: 0}
+  lightingShader: {fileID: 0}
+  blitShader: {fileID: 0}
+  blitWithDepthShader: {fileID: 0}

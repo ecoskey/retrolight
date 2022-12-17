@@ -5,24 +5,17 @@ using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
 namespace Retrolight.Runtime.Passes {
-    public class LightingPass {
-        public const int MaximumLights = 1024;
-
-        private readonly RenderGraph renderGraph;
-
-        private readonly ComputeShader lightCullingShader;
-        private readonly int lightCullingKernelId;
-
-        private readonly ComputeShader lightingShader;
-        private readonly int lightingKernelId;
-        
+    public class LightingPass : RenderPass<LightingPass.LightingPassData> {
+        private const int MaximumLights = 1024;
         private static readonly int
             LightCountId = Shader.PropertyToID("LightCount"),
             LightBufferId = Shader.PropertyToID("Lights"),
             CullingResultsId = Shader.PropertyToID("CullingResults"),
             FinalColorTexId = Shader.PropertyToID("FinalColorTex");
 
-        class LightingPassData {
+        private readonly int lightCullingKernelId, lightingKernelId;
+
+        public class LightingPassData {
             public NativeArray<VisibleLight> Lights;
             public int LightCount;
             public Vector2Int TileCount;
@@ -52,29 +45,24 @@ namespace Retrolight.Runtime.Passes {
                 FinalColorTex = finalColorTex;
             }
         }
-
-        public LightingPass(RenderGraph renderGraph, ShaderBundle shaderBundle) {
-            this.renderGraph = renderGraph;
-            lightCullingShader = shaderBundle.LightCullShader;
-            lightCullingKernelId = lightCullingShader.FindKernel("LightCulling");
-            lightingShader = shaderBundle.LightingShader;
-            lightingKernelId = lightingShader.FindKernel("Lighting");
+        
+        public LightingPass(RetrolightPipeline pipeline) : base(pipeline) {
+            lightCullingKernelId = ShaderBundle.LightCullingShader.FindKernel("LightCulling");
+            lightingKernelId = ShaderBundle.LightingShader.FindKernel("Lighting");
         }
-
-        public LightingOut Run(Camera camera, CullingResults cull, GBuffer gBuffer) {
-            using var builder = renderGraph.AddRenderPass(
-                "Lighting Pass", 
-                out LightingPassData passData, 
-                new ProfilingSampler("GBuffer Pass Profiler")
-            );
+        
+        protected override string PassName => "Lighting Pass";
+        
+        public LightingOut Run(GBuffer gBuffer) {
+            using var builder = CreatePass(out var passData);
             
-            passData.Lights = cull.visibleLights;
+            passData.Lights = Cull.visibleLights;
             int lightCount = Math.Min(passData.Lights.Length, MaximumLights);
             passData.LightCount = lightCount;
                 
             Vector2Int tileCount = new Vector2Int(
-                Mathf.CeilToInt(camera.pixelWidth / 8f),
-                Mathf.CeilToInt(camera.pixelHeight / 8f)
+                Mathf.CeilToInt(Camera.pixelWidth / 8f),
+                Mathf.CeilToInt(Camera.pixelHeight / 8f)
             );
             passData.TileCount = tileCount;
 
@@ -82,7 +70,7 @@ namespace Retrolight.Runtime.Passes {
                 name = "Lights",
                 type = ComputeBufferType.Structured
             };
-            var lightsBuffer = renderGraph.CreateComputeBuffer(lightsDesc);
+            var lightsBuffer = RenderGraph.CreateComputeBuffer(lightsDesc);
             lightsBuffer = builder.WriteComputeBuffer(lightsBuffer);
             passData.LightBuffer = lightsBuffer;
                 
@@ -93,7 +81,7 @@ namespace Retrolight.Runtime.Passes {
                 name = "CulledLights", 
                 type = ComputeBufferType.Raw,
             };
-            var culledLightsBuffer = renderGraph.CreateComputeBuffer(culledLightsDesc);
+            var culledLightsBuffer = RenderGraph.CreateComputeBuffer(culledLightsDesc);
             culledLightsBuffer = builder.WriteComputeBuffer(culledLightsBuffer);
             passData.CullingResultsBuffer = culledLightsBuffer;
 
@@ -101,24 +89,26 @@ namespace Retrolight.Runtime.Passes {
 
             var finalColorDesc = TextureUtility.ColorTex("FinalColorTex");
             finalColorDesc.enableRandomWrite = true;
-            var finalColor = renderGraph.CreateTexture(finalColorDesc);
+            var finalColor = RenderGraph.CreateTexture(finalColorDesc);
             finalColor = builder.WriteTexture(finalColor);
             passData.FinalColorTex = finalColor;
 
             passData.Resolution = new Vector4(
-                camera.pixelWidth, camera.pixelHeight, 
-                1f / camera.pixelWidth, 1f / camera.pixelHeight
+                Camera.pixelWidth, Camera.pixelHeight, 
+                1f / Camera.pixelWidth, 1f / Camera.pixelHeight
             );
 
             builder.SetRenderFunc<LightingPassData>(Render);
             return new LightingOut(passData.LightCount, lightsBuffer, culledLightsBuffer, finalColor);
         }
 
-        private void Render(LightingPassData passData, RenderGraphContext context) {
+        protected override void Render(LightingPassData passData, RenderGraphContext context) {
             NativeArray<VisibleLight> lights = passData.Lights;
+            ComputeShader lightCullingShader = ShaderBundle.LightCullingShader;
+            ComputeShader lightingShader = ShaderBundle.LightingShader;
             ComputeBuffer lightBuffer = passData.LightBuffer;
             ComputeBuffer cullingResultsBuffer = passData.CullingResultsBuffer;
-            
+
             NativeArray<PackedLight> packedLights = new NativeArray<PackedLight>( //todo: this is a lot of allocation/deallocation each frame
                 MaximumLights, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory

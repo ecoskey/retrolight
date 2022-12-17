@@ -4,36 +4,30 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
 
 namespace Retrolight.Runtime.Passes {
-    public class GBufferPass {
+    public class GBufferPass : RenderPass<GBufferPass.GBufferPassData> {
         private static readonly ShaderTagId GBufferPassId = new ShaderTagId("RetrolightGBuffer");
         private static readonly int
             AlbedoTexId = Shader.PropertyToID("AlbedoTex"),
             DepthTexId = Shader.PropertyToID("DepthTex"),
             NormalTexId = Shader.PropertyToID("NormalTex"),
             AttributesTexId = Shader.PropertyToID("AttributesTex");
-
-        private readonly RenderGraph renderGraph;
         
-        class GBufferPassData {
+        public class GBufferPassData {
             public GBuffer GBuffer;
             public RendererListHandle GBufferRendererList;
         }
 
-        public GBufferPass(RenderGraph renderGraph) {
-            this.renderGraph = renderGraph;
-        }
+        public GBufferPass(RetrolightPipeline pipeline) : base(pipeline) { }
 
-        public GBuffer Run(Camera camera, CullingResults cull) {
-            using var builder = renderGraph.AddRenderPass(
-                "Geometry Pass", 
-                out GBufferPassData passData, 
-                new ProfilingSampler("GBuffer Pass Profiler")
-            );
+        protected override string PassName => "GBuffer Pass";
+        
+        public GBuffer Run() {
+            using var builder = CreatePass(out var passData);
             
-            TextureHandle albedo = renderGraph.CreateTexture(TextureUtility.ColorTex("AlbedoTex"));
-            TextureHandle depth = renderGraph.CreateTexture(TextureUtility.DepthTex());
-            TextureHandle normal = renderGraph.CreateTexture(TextureUtility.ColorTex("NormalTex"));
-            TextureHandle attributes = renderGraph.CreateTexture(TextureUtility.ColorTex("AttributesTex"));
+            TextureHandle albedo = RenderGraph.CreateTexture(TextureUtility.ColorTex("AlbedoTex"));
+            TextureHandle depth = RenderGraph.CreateTexture(TextureUtility.DepthTex());
+            TextureHandle normal = RenderGraph.CreateTexture(TextureUtility.ColorTex("NormalTex"));
+            TextureHandle attributes = RenderGraph.CreateTexture(TextureUtility.ColorTex("AttributesTex"));
 
             GBuffer gBuffer = new GBuffer(
                 builder.UseColorBuffer(albedo, 0), 
@@ -43,18 +37,17 @@ namespace Retrolight.Runtime.Passes {
             );
             passData.GBuffer = gBuffer;
 
-            RendererListDesc gBufferRendererDesc  = new RendererListDesc(GBufferPassId, cull, camera) {
+            RendererListDesc gBufferRendererDesc  = new RendererListDesc(GBufferPassId, Cull, Camera) {
                 sortingCriteria = SortingCriteria.CommonOpaque,
                 renderQueueRange = RenderQueueRange.opaque
             };
-            RendererListHandle gBufferRendererHandle = renderGraph.CreateRendererList(gBufferRendererDesc);
+            RendererListHandle gBufferRendererHandle = RenderGraph.CreateRendererList(gBufferRendererDesc);
             passData.GBufferRendererList = builder.UseRendererList(gBufferRendererHandle);
                 
-            builder.SetRenderFunc<GBufferPassData>(Render);
             return gBuffer;
         }
 
-        private static void Render(GBufferPassData passData, RenderGraphContext context) {
+        protected override void Render(GBufferPassData passData, RenderGraphContext context) {
             CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.GBufferRendererList);
             
             context.cmd.SetGlobalTexture(AlbedoTexId, passData.GBuffer.Albedo);

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
@@ -5,28 +6,43 @@ using Retrolight.Runtime.Passes;
 
 namespace Retrolight.Runtime {
     public class RetrolightPipeline : RenderPipeline {
-        private RenderGraph renderGraph;
-        private readonly ShaderBundle shaderBundle;
+        public RenderGraph RenderGraph { get; private set; }
+        public readonly ShaderBundle ShaderBundle;
 
+        public struct FrameRenderData {
+            public readonly Camera Camera;
+            public readonly CullingResults Cull;
+            public readonly RTHandleProperties RTHandleProperties;
+
+            public FrameRenderData(Camera camera, CullingResults cull, RTHandleProperties rtHandleProperties) {
+                Camera = camera;
+                Cull = cull;
+                RTHandleProperties = rtHandleProperties;
+            }
+        }
+
+        public FrameRenderData FrameData { get; private set; }
+
+        //render passes
         private GBufferPass gBufferPass;
         private LightingPass lightingPass;
         //private TransparentPass transparentPass;
         private FinalPass finalPass;
 
         public RetrolightPipeline(ShaderBundle shaderBundle, uint pixelScale) {
-            renderGraph = new RenderGraph("Retrolight Render Graph");
-            this.shaderBundle = shaderBundle;
+            RenderGraph = new RenderGraph("Retrolight Render Graph");
+            ShaderBundle = shaderBundle;
 
-            gBufferPass = new GBufferPass(renderGraph);
-            lightingPass = new LightingPass(renderGraph, shaderBundle);
+            gBufferPass = new GBufferPass(this);
+            lightingPass = new LightingPass(this);
             //transparentPass = new TransparentPass(renderGraph);
-            finalPass = new FinalPass(renderGraph);
+            finalPass = new FinalPass(this);
             
             Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
             RTHandles.Initialize(Screen.width, Screen.height);
         }
         
-        protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
+        protected sealed override void Render(ScriptableRenderContext context, Camera[] cameras) {
             //TODO: FIGURE OUT DUMB RTHANDLE SCALE BUG
             /*Debug.Log(RTHandles.maxWidth);
             Debug.Log(RTHandles.maxHeight);*/
@@ -36,16 +52,17 @@ namespace Retrolight.Runtime {
                 RenderCamera(context, camera);
                 EndCameraRendering(context, camera);
             }
-            renderGraph.EndFrame();
+            RenderGraph.EndFrame();
             EndFrameRendering(context, cameras);
         }
         
         private void RenderCamera(ScriptableRenderContext context, Camera camera) {
             if (!camera.TryGetCullingParameters(out var cullingParams)) return;
             CullingResults cull = context.Cull(ref cullingParams);
+            RTHandles.SetReferenceSize(camera.pixelWidth, camera.pixelHeight);
+            FrameData = new FrameRenderData(camera, cull, RTHandles.rtHandleProperties);
             
             context.SetupCameraProperties(camera);
-            RTHandles.SetReferenceSize(camera.pixelWidth, camera.pixelHeight);
 
             CommandBuffer cmd = CommandBufferPool.Get("Execute Retrolight Render Graph");
             var renderGraphParams = new RenderGraphParameters {
@@ -54,23 +71,26 @@ namespace Retrolight.Runtime {
                 currentFrameIndex = Time.frameCount,
             };
 
-            using (renderGraph.RecordAndExecute(renderGraphParams)) 
-                RenderPasses(camera, cull);
+            using (RenderGraph.RecordAndExecute(renderGraphParams)) 
+                RenderPasses();
 
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
             context.Submit();
         }
         
-        private void RenderPasses(Camera camera, CullingResults cull) {
-            var gBuffer = gBufferPass.Run(camera, cull);
-            var lightingOut = lightingPass.Run(camera, cull, gBuffer);
+        protected virtual void RenderPasses() {
+            var gBuffer = gBufferPass.Run();
+            var lightingOut = lightingPass.Run(gBuffer);
             //transparentPass.Run(camera, cull, lightingOut.FinalColor);
             //PostProcessPass -> writes to final color buffer after all other shaders
-            finalPass.Run(camera, lightingOut.FinalColorTex); //todo: use final color buffer as input
+            finalPass.Run(lightingOut.FinalColorTex); //todo: use final color buffer as input
         }
 
-        protected override void Dispose(bool disposing) {
+        public override RenderPipelineGlobalSettings defaultSettings { get; }
+        protected override void ProcessRenderRequests(ScriptableRenderContext context, Camera camera, List<Camera.RenderRequest> renderRequests) { base.ProcessRenderRequests(context, camera, renderRequests); }
+
+        protected sealed override void Dispose(bool disposing) {
             if (!disposing) return;
             
             gBufferPass = null;
@@ -79,8 +99,8 @@ namespace Retrolight.Runtime {
             finalPass = null;
 
             Blitter.Cleanup();
-            renderGraph.Cleanup();
-            renderGraph = null;
+            RenderGraph.Cleanup();
+            RenderGraph = null;
         }
     }
 }
