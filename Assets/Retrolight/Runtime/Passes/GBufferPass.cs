@@ -31,16 +31,11 @@ namespace Retrolight.Runtime.Passes {
         public GBuffer Run() {
             using var builder = InitPass(out var passData);
             
-            TextureHandle albedo = CreateColorTex(albedoTexName);
-            TextureHandle depth = CreateDepthTex(depthTexName);
-            TextureHandle normal = CreateColorTex(normalTexName);
-            TextureHandle attributes = CreateColorTex(attributesTexName);
-
             GBuffer gBuffer = new GBuffer(
-                builder.UseColorBuffer(albedo, 0), 
-                builder.UseDepthBuffer(depth, DepthAccess.Write), 
-                builder.UseColorBuffer(normal, 1),
-                builder.UseColorBuffer(attributes, 2)
+                CreateUseColorBuffer(builder, 0, albedoTexName), 
+                CreateUseDepthBuffer(builder, DepthAccess.Write, depthTexName), 
+                CreateUseColorBuffer(builder, 1, normalTexName),
+                CreateUseColorBuffer(builder, 2, attributesTexName)
             );
             passData.GBuffer = gBuffer;
 
@@ -56,11 +51,12 @@ namespace Retrolight.Runtime.Passes {
 
         protected override void Render(GBufferPassData passData, RenderGraphContext context) {
             CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.GBufferRendererList);
-            
-            context.cmd.SetGlobalTexture(albedoTexId, passData.GBuffer.Albedo);
-            context.cmd.SetGlobalTexture(depthTexId, passData.GBuffer.Depth);
-            context.cmd.SetGlobalTexture(normalTexId, passData.GBuffer.Normal);
-            context.cmd.SetGlobalTexture(attributesTexId, passData.GBuffer.Attributes);
+
+            var gBuffer = passData.GBuffer;
+            context.cmd.SetGlobalTexture(albedoTexId, gBuffer.Albedo);
+            context.cmd.SetGlobalTexture(depthTexId, gBuffer.Depth);
+            context.cmd.SetGlobalTexture(normalTexId, gBuffer.Normal);
+            context.cmd.SetGlobalTexture(attributesTexId, gBuffer.Attributes);
         }
     }
 }

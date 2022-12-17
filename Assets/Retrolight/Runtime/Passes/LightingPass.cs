@@ -89,8 +89,7 @@ namespace Retrolight.Runtime.Passes {
 
             var finalColorDesc = TextureUtility.ColorTex("FinalColorTex");
             finalColorDesc.enableRandomWrite = true;
-            var finalColor = renderGraph.CreateTexture(finalColorDesc);
-            finalColor = builder.WriteTexture(finalColor);
+            var finalColor = builder.WriteTexture(renderGraph.CreateTexture(finalColorDesc));
             passData.FinalColorTex = finalColor;
 
             //todo: setup resolution, shader properties in a different SetupPass?

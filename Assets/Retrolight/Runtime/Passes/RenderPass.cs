@@ -34,14 +34,65 @@ namespace Retrolight.Runtime.Passes {
             renderGraph.CreateTexture(TextureUtility.ColorTex(scale, name));
 
         protected TextureHandle CreateColorTex(
-            Vector2 scale, GraphicsFormat format,
+            Vector2 scale, GraphicsFormat format, 
             string name = TextureUtility.DefaultColorTexName
         ) => renderGraph.CreateTexture(TextureUtility.ColorTex(scale, format, name));
+
+        protected TextureHandle CreateWriteColorTex(
+            RenderGraphBuilder builder, 
+            string name = TextureUtility.DefaultColorTexName
+        ) => builder.WriteTexture(CreateColorTex(name));
+
+
+        protected TextureHandle CreateWriteColorTex(
+            RenderGraphBuilder builder, Vector2 scale, 
+            string name = TextureUtility.DefaultColorTexName
+        ) => builder.WriteTexture(CreateColorTex(scale, name));
+
+        protected TextureHandle CreateWriteColorTex(
+            RenderGraphBuilder builder, Vector2 scale, GraphicsFormat format,
+            string name = TextureUtility.DefaultColorTexName
+        ) => builder.WriteTexture(CreateColorTex(scale, format, name));
+
+        protected TextureHandle CreateUseColorBuffer(
+            RenderGraphBuilder builder, int index,
+            string name = TextureUtility.DefaultColorTexName
+        ) => builder.UseColorBuffer(CreateColorTex(name), index);
+
+        protected TextureHandle CreateUseColorBuffer(
+            RenderGraphBuilder builder, int index, Vector2 scale,
+            string name = TextureUtility.DefaultColorTexName
+        ) => builder.UseColorBuffer(CreateColorTex(scale, name), index);
+
+        protected TextureHandle CreateUseColorBuffer(
+            RenderGraphBuilder builder, int index, Vector2 scale, GraphicsFormat format,
+            string name = TextureUtility.DefaultColorTexName
+        ) => builder.UseColorBuffer(CreateColorTex(scale, format, name), index);
 
         protected TextureHandle CreateDepthTex(string name = TextureUtility.DefaultDepthTexName) =>
             renderGraph.CreateTexture(TextureUtility.DepthTex(name));
 
         protected TextureHandle CreateDepthTex(Vector2 scale, string name = TextureUtility.DefaultDepthTexName) =>
             renderGraph.CreateTexture(TextureUtility.DepthTex(scale, name));
+
+        protected TextureHandle CreateWriteDepthDex(
+            RenderGraphBuilder builder,
+            string name = TextureUtility.DefaultDepthTexName
+        ) => builder.WriteTexture(CreateDepthTex(name));
+
+        protected TextureHandle CreateWriteDepthTex(
+            RenderGraphBuilder builder, Vector2 scale,
+            string name = TextureUtility.DefaultDepthTexName
+        ) => builder.WriteTexture(CreateDepthTex(scale, name));
+        
+        protected TextureHandle CreateUseDepthBuffer(
+            RenderGraphBuilder builder, DepthAccess access,
+            string name = TextureUtility.DefaultDepthTexName
+        ) => builder.UseDepthBuffer(CreateDepthTex(name), access);
+
+        protected TextureHandle CreateUseDepthBuffer(
+            RenderGraphBuilder builder, DepthAccess access, Vector2 scale, 
+            string name = TextureUtility.DefaultDepthTexName
+        ) => builder.UseDepthBuffer(CreateDepthTex(scale, name), access);
     }
 }

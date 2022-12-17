@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
@@ -6,22 +5,9 @@ using Retrolight.Runtime.Passes;
 
 namespace Retrolight.Runtime {
     public class RetrolightPipeline : RenderPipeline {
-        public RenderGraph RenderGraph { get; private set; }
-        public readonly ShaderBundle ShaderBundle;
-
-        public struct FrameRenderData {
-            public readonly Camera Camera;
-            public readonly CullingResults Cull;
-            public readonly RTHandleProperties RTHandleProperties;
-
-            public FrameRenderData(Camera camera, CullingResults cull, RTHandleProperties rtHandleProperties) {
-                Camera = camera;
-                Cull = cull;
-                RTHandleProperties = rtHandleProperties;
-            }
-        }
-
-        public FrameRenderData FrameData { get; private set; }
+        protected internal RenderGraph RenderGraph { get; private set; }
+        internal readonly ShaderBundle ShaderBundle;
+        internal FrameData FrameData { get; private set; }
 
         //render passes
         protected GBufferPass GBufferPass;
@@ -60,7 +46,7 @@ namespace Retrolight.Runtime {
             if (!camera.TryGetCullingParameters(out var cullingParams)) return;
             CullingResults cull = context.Cull(ref cullingParams);
             RTHandles.SetReferenceSize(camera.pixelWidth, camera.pixelHeight);
-            FrameData = new FrameRenderData(camera, cull, RTHandles.rtHandleProperties);
+            FrameData = new FrameData(camera, cull, RTHandles.rtHandleProperties);
             
             context.SetupCameraProperties(camera);
 
