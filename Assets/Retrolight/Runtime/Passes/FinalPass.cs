@@ -14,7 +14,7 @@ namespace Retrolight.Runtime.Passes {
         public override string PassName => "Final Pass";
 
         public void Run(TextureHandle finalColor) {
-            using var builder = InitPass(out var passData);
+            using var builder = CreatePass(out var passData);
 
             passData.FinalColorTex = builder.ReadTexture(finalColor);
             TextureHandle cameraTarget = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CameraTarget);

@@ -29,7 +29,7 @@ namespace Retrolight.Runtime.Passes {
         public override string PassName => "GBuffer Pass";
 
         public GBuffer Run() {
-            using var builder = InitPass(out var passData);
+            using var builder = CreatePass(out var passData);
 
             GBuffer gBuffer = new GBuffer(
                 CreateUseColorBuffer(builder, 0, albedoTexName),

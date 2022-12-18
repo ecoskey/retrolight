@@ -33,7 +33,7 @@ namespace Retrolight.Runtime.Passes {
         public override string PassName => "Lighting Pass";
 
         public TextureHandle Run(GBuffer gBuffer, Vector2Int tileCount) {
-            using var builder = InitPass(out var passData);
+            using var builder = CreatePass(out var passData);
 
             gBuffer.ReadAll(builder);
 

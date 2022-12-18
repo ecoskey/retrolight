@@ -8,10 +8,15 @@ namespace Retrolight.Runtime.Passes {
 
         public override string PassName => "Setup Pass";
 
-        public void Run() => InitPass(out _);
+        public void Run() {
+            var builder = CreatePass(out _); 
+            
+            //todo: calculate tiling size, resolution and reciprocal resolution
+            //todo: find other common setup stuff to include here
+        }
 
         protected override void Render(SetupPassData passData, RenderGraphContext context) {
-            throw new System.NotImplementedException();
+            //todo: pass resolution, etc. and rthandle properties as shader variables
         }
     }
 }

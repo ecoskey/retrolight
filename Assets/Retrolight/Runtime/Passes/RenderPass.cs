@@ -20,7 +20,7 @@ namespace Retrolight.Runtime.Passes {
         public abstract string PassName { get; }
         protected abstract void Render(T passData, RenderGraphContext context);
 
-        protected RenderGraphBuilder InitPass(out T passData) {
+        protected RenderGraphBuilder CreatePass(out T passData) {
             var builder = renderGraph.AddRenderPass(
                 PassName, out passData,
                 new ProfilingSampler(PassName + " Profiler")

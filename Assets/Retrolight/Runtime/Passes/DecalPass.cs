@@ -15,7 +15,7 @@ namespace Retrolight.Runtime.Passes {
         public override string PassName => "Decal Pass";
 
         public void Run(GBuffer gBuffer) {
-            using var builder = InitPass(out var passData);
+            using var builder = CreatePass(out var passData);
 
             gBuffer.ReadAll(builder);
             builder.UseColorBuffer(gBuffer.Albedo, 0);
