@@ -12,7 +12,7 @@ namespace Retrolight.Runtime.Passes {
 
         public TransparentPass(Retrolight pipeline) : base(pipeline) { }
 
-        public override string PassName => "Transparent Pass";
+        protected override string PassName => "Transparent Pass";
 
         public void Run(GBuffer gBuffer, TextureHandle colorTarget) {
             using var builder = CreatePass(out var passData);

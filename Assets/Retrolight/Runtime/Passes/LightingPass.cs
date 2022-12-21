@@ -30,9 +30,9 @@ namespace Retrolight.Runtime.Passes {
             lightingKernelId = shaderBundle.LightingShader.FindKernel("Lighting");
         }
 
-        public override string PassName => "Lighting Pass";
+        protected override string PassName => "Lighting Pass";
 
-        public TextureHandle Run(GBuffer gBuffer, Vector2Int tileCount) {
+        public TextureHandle Run(GBuffer gBuffer) {
             using var builder = CreatePass(out var passData);
 
             gBuffer.ReadAll(builder);
@@ -41,11 +41,7 @@ namespace Retrolight.Runtime.Passes {
             int lightCount = Math.Min(passData.Lights.Length, maximumLights);
             passData.LightCount = lightCount;
 
-            /*Vector2Int tileCount = new Vector2Int(
-                Mathf.CeilToInt(camera.pixelWidth / 8f),
-                Mathf.CeilToInt(camera.pixelHeight / 8f)
-            );*/
-            passData.TileCount = tileCount;
+            passData.TileCount = viewportParams.TileCount;
 
             var lightsDesc = new ComputeBufferDesc(maximumLights, PackedLight.Stride) {
                 name = "Lights",
@@ -54,7 +50,7 @@ namespace Retrolight.Runtime.Passes {
             passData.LightBuffer = CreateWriteComputeBuffer(builder, lightsDesc);
 
             var cullingResultsDesc = new ComputeBufferDesc(
-                Mathf.CeilToInt(maximumLights / 32f) * tileCount.x * tileCount.y,
+                Mathf.CeilToInt(maximumLights / 32f) * viewportParams.TileCount.x * viewportParams.TileCount.y,
                 sizeof(uint)
             ) {
                 name = "Culling Results",
@@ -76,8 +72,9 @@ namespace Retrolight.Runtime.Passes {
                 maximumLights, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory
             );
-            for (int i = 0; i < passData.LightCount; i++) 
+            for (int i = 0; i < passData.LightCount; i++) {
                 packedLights[i] = new PackedLight(passData.Lights[i]);
+            }
             context.cmd.SetBufferData(passData.LightBuffer, packedLights, 0, 0, passData.LightCount);
             packedLights.Dispose();
             

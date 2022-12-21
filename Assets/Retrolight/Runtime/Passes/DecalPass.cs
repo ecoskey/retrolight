@@ -12,7 +12,7 @@ namespace Retrolight.Runtime.Passes {
 
         public DecalPass(Retrolight pipeline) : base(pipeline) { }
 
-        public override string PassName => "Decal Pass";
+        protected override string PassName => "Decal Pass";
 
         public void Run(GBuffer gBuffer) {
             using var builder = CreatePass(out var passData);

@@ -19,7 +19,7 @@ UNITY_DEFINE_INSTANCED_PROP(float, _DepthEdgeStrength)
 UNITY_DEFINE_INSTANCED_PROP(float, _NormalEdgeStrength)
 UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
-#define INPUT_PROP(prop) UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, prop)
+#define ACCESS_PROP(prop) UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, prop)
 
 struct VertexInput
 {
@@ -49,7 +49,7 @@ struct GBufferOut
 float3 GetNormalTS(float2 baseUV)
 {
     float4 map = SAMPLE_TEXTURE2D(_NormalMap, sampler_MainTex, baseUV);
-    float scale = INPUT_PROP(_NormalScale);
+    float scale = ACCESS_PROP(_NormalScale);
     float3 normal = DecodeNormal(map, scale);
     return normal;
 }
@@ -62,7 +62,7 @@ V2F GBufferVertex(VertexInput input)
     output.positionCS = TransformObjectToHClip(input.positionOS);
     output.normalWS = TransformObjectToWorldNormal(input.normalOS);
     output.tangentWS = float4(TransformObjectToWorldDir(input.tangentOS.xyz), input.tangentOS.w);
-    float4 baseST = INPUT_PROP(_MainTex_ST);
+    float4 baseST = ACCESS_PROP(_MainTex_ST);
     output.uv = input.uv * baseST.xy + baseST.zw;
     return output;
 }
@@ -72,9 +72,9 @@ GBufferOut GBufferFragment(V2F input)
     UNITY_SETUP_INSTANCE_ID(input);
     GBufferOut output;
     float4 baseMap = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
-    float4 baseColor = INPUT_PROP(_MainColor);
+    float4 baseColor = ACCESS_PROP(_MainColor);
     float4 color = baseMap * baseColor;
-    clip(color.a - INPUT_PROP(_Cutoff));
+    clip(color.a - ACCESS_PROP(_Cutoff));
     output.albedo = color;
 
     float3 normal = NormalTangentToWorld(GetNormalTS(input.uv), input.normalWS, input.tangentWS);
@@ -82,10 +82,10 @@ GBufferOut GBufferFragment(V2F input)
     output.normal = float4((normNorm + 1) / 2, 1);
 
     output.attributes = float4(
-        INPUT_PROP(_Metallic),
-        INPUT_PROP(_Smoothness),
-        INPUT_PROP(_DepthEdgeStrength),
-        INPUT_PROP(_NormalEdgeStrength)
+        ACCESS_PROP(_Metallic),
+        ACCESS_PROP(_Smoothness),
+        ACCESS_PROP(_DepthEdgeStrength),
+        ACCESS_PROP(_NormalEdgeStrength)
     );
 
     return output;

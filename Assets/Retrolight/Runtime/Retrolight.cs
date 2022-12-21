@@ -4,21 +4,24 @@ using UnityEngine.Rendering;
 using Retrolight.Runtime.Passes;
 
 namespace Retrolight.Runtime {
-    public class Retrolight : RenderPipeline {
-        protected internal RenderGraph RenderGraph { get; private set; }
+    public sealed class Retrolight : RenderPipeline {
+        internal RenderGraph RenderGraph { get; private set; }
         internal readonly ShaderBundle ShaderBundle;
         internal FrameData FrameData { get; private set; }
 
         //render passes
-        protected GBufferPass GBufferPass;
-        protected LightingPass LightingPass;
-        protected TransparentPass TransparentPass;
-        protected FinalPass FinalPass;
+        private SetupPass SetupPass;
+        private GBufferPass GBufferPass;
+        private LightingPass LightingPass;
+        private TransparentPass TransparentPass;
+        private FinalPass FinalPass;
 
         public Retrolight(ShaderBundle shaderBundle, uint pixelScale) {
+            //todo: enable SRP batcher, other graphics settings like linear light intensity
             RenderGraph = new RenderGraph("Retrolight Render Graph");
             ShaderBundle = shaderBundle;
 
+            SetupPass = new SetupPass(this);
             GBufferPass = new GBufferPass(this);
             LightingPass = new LightingPass(this);
             TransparentPass = new TransparentPass(this);
@@ -28,7 +31,7 @@ namespace Retrolight.Runtime {
             RTHandles.Initialize(Screen.width, Screen.height);
         }
 
-        protected sealed override void Render(ScriptableRenderContext context, Camera[] cameras) {
+        protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
             BeginFrameRendering(context, cameras);
             foreach (var camera in cameras) {
                 BeginCameraRendering(context, camera);
@@ -43,7 +46,7 @@ namespace Retrolight.Runtime {
             if (!camera.TryGetCullingParameters(out var cullingParams)) return;
             CullingResults cull = context.Cull(ref cullingParams);
             RTHandles.SetReferenceSize(camera.pixelWidth, camera.pixelHeight);
-            FrameData = new FrameData(camera, cull, RTHandles.rtHandleProperties);
+            FrameData = new FrameData(camera, cull, new ViewportParams(RTHandles.rtHandleProperties));
 
             context.SetupCameraProperties(camera);
 
@@ -54,25 +57,34 @@ namespace Retrolight.Runtime {
                 currentFrameIndex = Time.frameCount,
             };
 
-            using (RenderGraph.RecordAndExecute(renderGraphParams))
+            using (RenderGraph.RecordAndExecute(renderGraphParams)) {
                 RenderPasses();
-
+            }
+            
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
             context.Submit();
         }
 
-        protected virtual void RenderPasses() {
+        private void RenderPasses() {
+            SetupPass.Run();
             var gBuffer = GBufferPass.Run();
-            var finalColorTex = LightingPass.Run(gBuffer, Vector2Int.zero); //todo: 
+            var finalColorTex = LightingPass.Run(gBuffer);
             TransparentPass.Run(gBuffer, finalColorTex);
             //PostProcessPass -> writes to final color buffer after all other shaders
             FinalPass.Run(finalColorTex);
         }
 
-        protected sealed override void Dispose(bool disposing) {
+        protected override void Dispose(bool disposing) {
             if (!disposing) return;
 
+            SetupPass.Dispose();
+            GBufferPass.Dispose();
+            LightingPass.Dispose();
+            TransparentPass.Dispose();
+            FinalPass.Dispose();
+
+            SetupPass = null;
             GBufferPass = null;
             LightingPass = null;
             TransparentPass = null;

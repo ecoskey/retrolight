@@ -1,7 +1,7 @@
 #pragma kernel LightCulling
 
 #include "../ShaderLibrary/Common.hlsl"
-#include "../ShaderLibrary/Tiling.hlsl"
+#include "../ShaderLibrary/Viewport.hlsl"
 #include "../ShaderLibrary/Light.hlsl"
 #include "../ShaderLibrary/Culling.hlsl"
 #include "../ShaderLibrary/GBuffer.hlsl"
@@ -48,7 +48,8 @@ uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip)
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void LightCulling(ThreadInfo input)
 {
-    const float depth = LoadEyeDepth(input.dispatchId);
+    if (IsPixelOOB(input.dispatchId)) return;
+    /*const float depth = LoadEyeDepth(input.dispatchId);
     #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
         const float _minDepth = WaveActiveMin(depth);
         const float _maxDepth = WaveActiveMax(depth);
@@ -122,6 +123,27 @@ void LightCulling(ThreadInfo input)
     }
 
     GroupMemoryBarrierWithGroupSync();
+
+    const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
+    UNITY_UNROLL
+    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE)
+    {
+        CullingResults.Store(globalTileOffset + i, tile[i]);
+    }*/
+
+    uint i;
+
+    UNITY_UNROLL
+    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE)
+    {
+        tile[i] = 0;
+    }
+
+    UNITY_LOOP
+    for (i = input.index; i < MAX_LIGHTS; i += TILE_SIZE * TILE_SIZE)
+    {
+        AllowLight(i);
+    }
 
     const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
     UNITY_UNROLL

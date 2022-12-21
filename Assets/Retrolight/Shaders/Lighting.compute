@@ -2,7 +2,8 @@
 
 #include "../ShaderLibrary/GBuffer.hlsl"
 #include "../ShaderLibrary/Light.hlsl"
-#include "../ShaderLibrary/Tiling.hlsl"
+#include "../ShaderLibrary/Viewport.hlsl"
+#include "../ShaderLibrary/Edges.hlsl"
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
@@ -15,33 +16,28 @@ ByteAddressBuffer CullingResults;
 
 RW_TEXTURE2D(float4, FinalColorTex);
 
-struct ThreadInfo
-{
+struct ThreadInfo {
     uint2 id : SV_GroupID;
     uint index : SV_GroupIndex;
     uint2 dispatchId : SV_DispatchThreadID;
     uint2 subId : SV_GroupThreadID;
 };
 
-float3 ProcessLight(Light light, uint2 dispatchId)
-{
+float3 ProcessLight(Light light, uint2 dispatchId) {
     const float3 normal = LoadNormal(dispatchId);
-    const float brightness = saturate(dot(normal, light.Direction()));
+    const float brightness = clamp(dot(normal, light.Direction()), 0.1, 1);
     return light.Color() * brightness;
 }
 
 [numthreads(8, 8, 1)]
-void Lighting(ThreadInfo input)
-{
-    //const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
-    //float3 accLight = 0;
-    /*UNITY_LOOP
-    for (int i = input.index; i < TILE_BUCKET_COUNT; i++) {
-        const uint lightsOffset = i * 32;
+void Lighting(ThreadInfo input) {
+    if (IsPixelOOB(input.dispatchId)) return;
+    /*const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
+    float3 accLight = 0;
+    UNITY_LOOP
+    for (uint i = 0; i * BUCKET_SIZE < LightCount; i++) { 
+        const uint lightsOffset = i * BUCKET_SIZE;
         uint bucket = CullingResults.Load(globalTileOffset + i);
-        #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
-        bucket = WaveReadLaneFirst(WaveActiveBitOr(bucket));
-        #endif 
         while (bucket != 0) {
             const uint firstLightIndex = firstbitlow(bucket);
             ClearBit(bucket, firstLightIndex);
@@ -49,7 +45,6 @@ void Lighting(ThreadInfo input)
             accLight += ProcessLight(light, input.dispatchId);
         }
     }*/
-    const float4 color = LoadAlbedo(input.dispatchId);
     const float3 normal = LoadNormal(input.dispatchId);
-    FinalColorTex[input.dispatchId] = color * saturate(dot(normal, float3(1, 1, 1)));
+    FinalColorTex[input.dispatchId] = /*float4(GetEdgeStrength(input.dispatchId), 0, 1) +*/ float4(normal, 0.25);
 }

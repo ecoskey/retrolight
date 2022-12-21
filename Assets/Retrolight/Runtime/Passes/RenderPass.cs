@@ -11,14 +11,15 @@ namespace Retrolight.Runtime.Passes {
         protected ShaderBundle shaderBundle => pipeline.ShaderBundle;
         protected Camera camera => pipeline.FrameData.Camera;
         protected CullingResults cull => pipeline.FrameData.Cull;
-        protected RTHandleProperties rtHandleProperties => pipeline.FrameData.RTHandleProperties;
+        protected ViewportParams viewportParams => pipeline.FrameData.ViewportParams;
 
         protected RenderPass(Retrolight pipeline) {
             this.pipeline = pipeline;
         }
 
-        public abstract string PassName { get; }
+        protected abstract string PassName { get; }
         protected abstract void Render(T passData, RenderGraphContext context);
+        public virtual void Dispose() { }
 
         protected RenderGraphBuilder CreatePass(out T passData) {
             var builder = renderGraph.AddRenderPass(
@@ -44,8 +45,7 @@ namespace Retrolight.Runtime.Passes {
             RenderGraphBuilder builder,
             string name = TextureUtility.DefaultColorTexName
         ) => builder.WriteTexture(CreateColorTex(name));
-
-
+        
         protected TextureHandle CreateWriteColorTex(
             RenderGraphBuilder builder, Vector2 scale,
             string name = TextureUtility.DefaultColorTexName

@@ -26,7 +26,7 @@ namespace Retrolight.Runtime.Passes {
 
         public GBufferPass(Retrolight pipeline) : base(pipeline) { }
 
-        public override string PassName => "GBuffer Pass";
+        protected override string PassName => "GBuffer Pass";
 
         public GBuffer Run() {
             using var builder = CreatePass(out var passData);

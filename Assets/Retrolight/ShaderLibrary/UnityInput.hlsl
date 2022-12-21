@@ -14,15 +14,18 @@ float4x4 unity_MatrixPreviousMI;
 float4 unity_MotionVectorsParams;
 CBUFFER_END
 
+CBUFFER_START(UnityPerFrame)
+float4x4 unity_MatrixV;
 float4x4 unity_MatrixVP;
 float4x4 unity_MatrixInvVP;
-float4x4 unity_MatrixV;
 float4x4 glstate_matrix_projection;
+CBUFFER_END
 
+CBUFFER_START(UnityPerCamera)
 float3 _WorldSpaceCameraPos;
-
-float4 _ZBufferParams;
 float4 _ProjectionParams;
+float4 _ZBufferParams;
 float4 unity_OrthoParams;
+CBUFFER_END
 
 #endif
