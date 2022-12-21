@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
-namespace Retrolight.Runtime {
+
+namespace Retrolight.Data {
     public struct ViewportParams {
         private const float tileSize = 8f;
         

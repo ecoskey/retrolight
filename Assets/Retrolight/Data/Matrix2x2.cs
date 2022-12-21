@@ -16,16 +16,13 @@ namespace Retrolight.Data {
             this.r1c0 = r1c0;
             this.r1c1 = r1c1;
         }
-        
-        public static Matrix2x2 Identity = new Matrix2x2() {
-            r0c0 = 1, r0c1 = 0,
-            r1c0 = 0, r1c1 = 1
-        };
-        
-        public static Matrix2x2 Zero = new Matrix2x2() {
-            r0c0 = 0, r0c1 = 0,
-            r1c0 = 0, r1c1 = 0
-        };
+
+        public static Matrix2x2 Identity = new Matrix2x2(
+            1, 0,
+            0, 1
+        );
+
+        public static Matrix2x2 Zero = new Matrix2x2(0, 0, 0, 0);
 
         public float this[int index] {
             get => index switch {
@@ -63,10 +60,10 @@ namespace Retrolight.Data {
         }
 
         public static Vector2 operator *(Matrix2x2 lhs, Vector2 rhs) {
-            return new Vector2 {
-                x = lhs.r0c0 * rhs.x + lhs.r1c0 * rhs.y, 
-                y = lhs.r0c1 * rhs.x + lhs.r1c1 * rhs.y
-            };
+            return new Vector2 (
+                lhs.r0c0 * rhs.x + lhs.r1c0 * rhs.y, 
+                lhs.r0c1 * rhs.x + lhs.r1c1 * rhs.y
+            );
         }
 
         public static Matrix2x2 operator *(Matrix2x2 lhs, Matrix2x2 rhs) {

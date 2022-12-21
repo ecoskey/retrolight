@@ -1,9 +1,8 @@
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
-using LightType = UnityEngine.LightType;
 
-namespace Retrolight.Runtime {
+namespace Retrolight.Data {
     [StructLayout(LayoutKind.Sequential)]
     public struct PackedLight {
         private Vector3 position;
@@ -35,8 +34,8 @@ namespace Retrolight.Runtime {
                     color32 = Mathf.FloatToHalf(light.finalColor.r) | (uint)Mathf.FloatToHalf(light.finalColor.g) << 16;
                     color16_extra16 = Mathf.FloatToHalf(light.finalColor.b);
                     //todo: get direction vector of light, rather than finalcolor for direction
-                    direction0 = Mathf.FloatToHalf(light.finalColor.r) |
-                        (uint)Mathf.FloatToHalf(light.finalColor.g) << 16;
+                    direction0 = Mathf.FloatToHalf(light.finalColor.r) | 
+                          (uint) Mathf.FloatToHalf(light.finalColor.g) << 16;
                     direction1 = Mathf.FloatToHalf(light.finalColor.b);
                     break;
                 default:

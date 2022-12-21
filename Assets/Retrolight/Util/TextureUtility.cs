@@ -4,7 +4,7 @@ using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UColor = UnityEngine.Color;
 
-namespace Retrolight.Runtime {
+namespace Retrolight.Util {
     public static class TextureUtility {
         public static bool IsSrgb => QualitySettings.activeColorSpace == ColorSpace.Gamma;
 
