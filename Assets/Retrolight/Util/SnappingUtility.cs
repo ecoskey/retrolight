@@ -5,44 +5,37 @@ using UnityEngine;
 namespace Retrolight.Util {
     public static class SnappingUtility {
         public readonly struct SnappingContext : IDisposable {
-            private readonly Transform tf;
+            private readonly Transform transform;
             private readonly Vector3 unSnappedPos;
+            public readonly Vector2 ViewportShift;
 
-            public SnappingContext(Transform tf, Vector3 unSnappedPos) {
-                this.tf = tf;
+            public SnappingContext(Transform transform, Vector3 unSnappedPos, Vector2 viewportShift) {
+                this.transform = transform;
                 this.unSnappedPos = unSnappedPos;
+                ViewportShift = viewportShift;
             }
 
-            public void Dispose() => tf.position = unSnappedPos;
+            public void Dispose() => transform.position = unSnappedPos;
         }
 
-        private static SnappingContext Snap(Transform tf, Vector2 pixelScale) {
-            Vector3 unSnappedPos = tf.position;
-            Vector3 eulerAngles = tf.rotation.eulerAngles;
-
-            float
-                sinX = Mathf.Sin(eulerAngles.x), // x is "vertical" rotation
-                cosX = Mathf.Sin(eulerAngles.x),
-                sinY = Mathf.Sin(eulerAngles.y), // y is "horizontal" rotation
-                cosY = Mathf.Sin(eulerAngles.y);
-
-            Matrix2x3 worldToPixel = new Matrix2x3(
-                cosY,        0,    -sinY,
-                sinX * sinY, cosX, cosY * cosY
-            );
-
-            Matrix2x2 pixelToWorld = new Matrix2x2( //in the context of the derivative of position with respect to time
-                cosY * cosY, sinY,
-                -sinX * sinY, cosY
-            );
+        public static SnappingContext Snap(Camera camera, Transform transform, ViewportParams viewportParams) {
+            float viewportHeight = 2f * camera.orthographicSize;
+            float scale = viewportParams.Resolution.y / viewportHeight; //todo: integrate pixelScale
+            Vector3 unSnappedPos = transform.position;
             
-            float pixelToWorldDet = 1f / (Mathf.Pow(cosY, 3) + sinX * sinY * sinY);
+            Vector3 pixelPos = scale * camera.worldToCameraMatrix.MultiplyVector(unSnappedPos);
+            Vector3 newPixelPos = new Vector3(
+                Mathf.Round(pixelPos.x), 
+                Mathf.Round(pixelPos.y), 
+                Mathf.Round(pixelPos.z)
+            );
+            Vector3 newPos = camera.cameraToWorldMatrix.MultiplyVector(newPixelPos / scale);
+            transform.position = newPos;
+
+            Vector2 viewportShift = pixelPos - newPixelPos;
+            viewportShift.Scale(new Vector2(viewportParams.Resolution.z, viewportParams.Resolution.w));
             
-            Vector2 pixelPos = pixelScale.x * (worldToPixel * unSnappedPos);
-            Vector2 dUdV = new Vector2(pixelPos.x % 1f, pixelPos.y % 1f);
-            Vector2 dXdZ = pixelScale.y * pixelToWorldDet * (pixelToWorld * -dUdV);
-            tf.Translate(dXdZ.x, 0, dXdZ.y);
-            return new SnappingContext(tf, unSnappedPos);
+            return new SnappingContext(transform, unSnappedPos, viewportShift);
         }
     }
 }

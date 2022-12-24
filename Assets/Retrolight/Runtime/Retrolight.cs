@@ -3,11 +3,13 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using Retrolight.Runtime.Passes;
+using Retrolight.Util;
 
 namespace Retrolight.Runtime {
     public sealed class Retrolight : RenderPipeline {
         internal RenderGraph RenderGraph { get; private set; }
         internal readonly ShaderBundle ShaderBundle;
+        internal readonly int PixelRatio;
         internal FrameData FrameData { get; private set; }
 
         //render passes
@@ -17,10 +19,11 @@ namespace Retrolight.Runtime {
         private TransparentPass TransparentPass;
         private FinalPass FinalPass;
 
-        public Retrolight(ShaderBundle shaderBundle, uint pixelScale) {
+        public Retrolight(ShaderBundle shaderBundle, int pixelRatio) {
             //todo: enable SRP batcher, other graphics settings like linear light intensity
             RenderGraph = new RenderGraph("Retrolight Render Graph");
             ShaderBundle = shaderBundle;
+            PixelRatio = pixelRatio;
 
             SetupPass = new SetupPass(this);
             GBufferPass = new GBufferPass(this);
@@ -29,7 +32,8 @@ namespace Retrolight.Runtime {
             FinalPass = new FinalPass(this);
 
             Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
-            RTHandles.Initialize(Screen.width, Screen.height);
+            RTHandles.Initialize(Screen.width / PixelRatio, Screen.height / PixelRatio);
+            RTHandles.ResetReferenceSize(Screen.width / PixelRatio, Screen.height / PixelRatio);
         }
 
         protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
@@ -46,8 +50,12 @@ namespace Retrolight.Runtime {
         private void RenderCamera(ScriptableRenderContext context, Camera camera) {
             if (!camera.TryGetCullingParameters(out var cullingParams)) return;
             CullingResults cull = context.Cull(ref cullingParams);
-            RTHandles.SetReferenceSize(camera.pixelWidth, camera.pixelHeight);
-            FrameData = new FrameData(camera, cull, new ViewportParams(RTHandles.rtHandleProperties));
+            
+            RTHandles.SetReferenceSize(camera.pixelWidth / PixelRatio, camera.pixelHeight / PixelRatio);
+            var viewportParams = new ViewportParams(RTHandles.rtHandleProperties);
+            FrameData = new FrameData(camera, cull, viewportParams);
+            
+            using var snapContext = SnappingUtility.Snap(camera, camera.transform, viewportParams);
 
             context.SetupCameraProperties(camera);
 
@@ -57,23 +65,27 @@ namespace Retrolight.Runtime {
                 commandBuffer = cmd,
                 currentFrameIndex = Time.frameCount,
             };
-
             using (RenderGraph.RecordAndExecute(renderGraphParams)) {
-                RenderPasses();
+                RenderPasses(snapContext.ViewportShift);
             }
-            
-            context.ExecuteCommandBuffer(cmd);
+
+            if (camera.clearFlags == CameraClearFlags.Skybox) {
+                context.DrawSkybox(camera);
+            }
+            context.ExecuteCommandBuffer(cmd);/*
+            context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
+            context.DrawGizmos(camera, GizmoSubset.PostImageEffects);*/
             CommandBufferPool.Release(cmd);
             context.Submit();
         }
 
-        private void RenderPasses() {
+        private void RenderPasses(Vector2 viewportShift) {
             SetupPass.Run();
             var gBuffer = GBufferPass.Run();
             var finalColorTex = LightingPass.Run(gBuffer);
             TransparentPass.Run(gBuffer, finalColorTex);
             //PostProcessPass -> writes to final color buffer after all other shaders
-            FinalPass.Run(finalColorTex);
+            FinalPass.Run(finalColorTex, viewportShift);
         }
 
         protected override void Dispose(bool disposing) {
@@ -90,6 +102,7 @@ namespace Retrolight.Runtime {
             LightingPass = null;
             TransparentPass = null;
             FinalPass = null;
+            
 
             Blitter.Cleanup();
             RenderGraph.Cleanup();

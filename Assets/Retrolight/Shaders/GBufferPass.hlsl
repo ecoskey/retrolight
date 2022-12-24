@@ -75,6 +75,7 @@ GBufferOut GBufferFragment(V2F input)
     float4 baseColor = ACCESS_PROP(_MainColor);
     float4 color = baseMap * baseColor;
     clip(color.a - ACCESS_PROP(_Cutoff));
+    color.a = 1;
     output.albedo = color;
 
     float3 normal = NormalTangentToWorld(GetNormalTS(input.uv), input.normalWS, input.tangentWS);

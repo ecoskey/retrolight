@@ -68,16 +68,16 @@ float4 LoadAttributes(uint2 pos) {
     return LOAD_TEXTURE2D(AttributesTex, pos);
 }
 
-/*float3 WorldSpaceFromDepth(float2 ndc) {
+float3 WorldSpaceFromDepth(float2 ndc) {
     const float depth = Sample01Depth(ndc);
     const float remappedDepth = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
     return ComputeWorldSpacePosition(ndc, remappedDepth, UNITY_MATRIX_I_VP);
 }
 
-float3 WorldSpaceFromDepthLOD(float2 ndc, float lod) {
-    const float depth = Sample01DepthLOD(ndc, lod);
+float3 WorldSpaceFromDepthCompute(uint2 pos, float2 reciprocalResolution) {
+    const float depth = Load01Depth(pos);
     const float remappedDepth = lerp(UNITY_NEAR_CLIP_VALUE, 1, depth);
-    return ComputeWorldSpacePosition(ndc, remappedDepth, UNITY_MATRIX_I_VP);
-}*/
+    return ComputeWorldSpacePosition(float2(pos) * reciprocalResolution, remappedDepth, UNITY_MATRIX_I_VP);
+}
 
 #endif

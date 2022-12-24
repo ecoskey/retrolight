@@ -30,4 +30,8 @@ uint2 ClampPixelPos(int2 pos) {
     return clamp(pos, uint2(0, 0), PixelCount);
 }
 
+float2 PixelToNDC(uint2 pos) {
+    return float2(pos) / PixelCount;
+}
+
 #endif

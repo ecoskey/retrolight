@@ -1,7 +1,5 @@
-Shader "Hidden/RetrolightBlitWithDepth"
-{
-	SubShader
-	{
+Shader "Hidden/RetrolightBlitWithDepth" {
+	SubShader {
 		Tags { 
 			"RenderType" = "Opaque" 
 			"RenderPipeline" = "Retrolight"
@@ -10,9 +8,9 @@ Shader "Hidden/RetrolightBlitWithDepth"
 		ZTest Always
 		ZWrite Off
 		Cull Off
+		Blend One One
 		
-		Pass
-		{
+		Pass {
 			HLSLPROGRAM
 			#pragma vertex FullscreenVertex
 			#pragma fragment BlitFragment

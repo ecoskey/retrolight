@@ -20,7 +20,7 @@ namespace Retrolight.Util {
         public static TextureDesc ColorTex(
             Vector2 scale, GraphicsFormat format,
             string name = DefaultColorTexName
-        ) => new TextureDesc(new Vector2(0.25f, 0.25f)) {
+        ) => new TextureDesc(scale) {
             colorFormat = format,
             depthBufferBits = DepthBits.None,
             clearBuffer = true,
@@ -35,7 +35,7 @@ namespace Retrolight.Util {
         public static TextureDesc DepthTex(string name = DefaultDepthTexName) => DepthTex(Vector2.one, name);
 
         public static TextureDesc DepthTex(Vector2 scale, string name = DefaultDepthTexName) =>
-            new TextureDesc(new Vector2(0.25f, 0.25f)) {
+            new TextureDesc(scale) {
                 colorFormat = GraphicsFormat.None,
                 depthBufferBits = DepthBits.Depth32,
                 clearBuffer = true,

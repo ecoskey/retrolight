@@ -1,7 +1,5 @@
-Shader "Hidden/RetrolightBlit"
-{
-	SubShader
-	{
+Shader "Hidden/RetrolightBlit" {
+	SubShader {
 		Tags { 
 			"RenderType" = "Opaque" 
 			"RenderPipeline" = "Retrolight"
@@ -10,9 +8,10 @@ Shader "Hidden/RetrolightBlit"
 		ZTest Always
 		ZWrite Off
 		Cull Off
+		Blend SrcAlpha OneMinusSrcAlpha
 		
-		Pass
-		{
+		Pass {
+			
 			HLSLPROGRAM
 			#pragma vertex FullscreenVertex
 			#pragma fragment BlitFragment
@@ -22,7 +21,7 @@ Shader "Hidden/RetrolightBlit"
 			
 			float4 _BlitScaleBias;
 			float _BlitMipLevel;
-
+			
 			#define FULLSCREEN_ST _BlitScaleBias
 			#include "../ShaderLibrary/Fullscreen.hlsl"
 

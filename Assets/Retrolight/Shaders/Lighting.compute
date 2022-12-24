@@ -1,7 +1,9 @@
 #pragma kernel Lighting
 
+#include "../ShaderLibrary/Common.hlsl"
 #include "../ShaderLibrary/GBuffer.hlsl"
 #include "../ShaderLibrary/Light.hlsl"
+#include "../ShaderLibrary/Lighting.hlsl"
 #include "../ShaderLibrary/Viewport.hlsl"
 #include "../ShaderLibrary/Edges.hlsl"
 
@@ -23,10 +25,20 @@ struct ThreadInfo {
     uint2 subId : SV_GroupThreadID;
 };
 
-float3 ProcessLight(Light light, uint2 dispatchId) {
-    const float3 normal = LoadNormal(dispatchId);
-    const float brightness = clamp(dot(normal, light.Direction()), 0.1, 1);
-    return light.Color() * brightness;
+float3 GetDeferredLighting(Light light, uint2 dispatchId) {
+    /*Surface surface;
+    surface.color = LoadAlbedo(dispatchId).rgb;
+    surface.position = WorldSpaceFromDepthCompute(dispatchId, Resolution.zw);
+    surface.normal = LoadNormal(dispatchId);
+    const float4 attributes = LoadAttributes(dispatchId);
+    surface.metallic = attributes.x;
+    surface.smoothness = attributes.y;
+    surface.depthEdgeStrength = attributes.z;
+    surface.normalEdgeStrength = attributes.w;
+    surface.alpha = 1;
+    //surface.viewDir = _WorldSpaceCameraPos - surface.position;
+    const BRDF brdf = GetBRDF(surface, false);
+    return GetLighting(surface, brdf, light);*/
 }
 
 [numthreads(8, 8, 1)]
@@ -42,9 +54,8 @@ void Lighting(ThreadInfo input) {
             const uint firstLightIndex = firstbitlow(bucket);
             ClearBit(bucket, firstLightIndex);
             const Light light = Lights[lightsOffset + firstLightIndex];
-            accLight += ProcessLight(light, input.dispatchId);
+            accLight += GetDeferredLighting(light, input.dispatchId);
         }
     }*/
-    const float3 normal = LoadNormal(input.dispatchId);
-    FinalColorTex[input.dispatchId] = /*float4(GetEdgeStrength(input.dispatchId), 0, 1) +*/ float4(normal, 0.25);
+    FinalColorTex[input.dispatchId] = LoadAlbedo(input.dispatchId);
 }
