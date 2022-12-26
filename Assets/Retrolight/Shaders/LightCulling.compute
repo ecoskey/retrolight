@@ -134,21 +134,18 @@ void LightCulling(ThreadInfo input)
     uint i;
 
     UNITY_UNROLL
-    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE)
-    {
+    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
         tile[i] = 0;
     }
 
     UNITY_LOOP
-    for (i = input.index; i < MAX_LIGHTS; i += TILE_SIZE * TILE_SIZE)
-    {
+    for (i = input.index; i < LightCount; i += TILE_SIZE * TILE_SIZE) {
         AllowLight(i);
     }
 
     const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
     UNITY_UNROLL
-    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE)
-    {
+    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
         CullingResults.Store(globalTileOffset + i, tile[i]);
     }
 }

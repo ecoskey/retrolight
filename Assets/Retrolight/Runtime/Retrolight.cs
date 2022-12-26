@@ -50,7 +50,6 @@ namespace Retrolight.Runtime {
         private void RenderCamera(ScriptableRenderContext context, Camera camera) {
             if (!camera.TryGetCullingParameters(out var cullingParams)) return;
             CullingResults cull = context.Cull(ref cullingParams);
-            
             RTHandles.SetReferenceSize(camera.pixelWidth / PixelRatio, camera.pixelHeight / PixelRatio);
             var viewportParams = new ViewportParams(RTHandles.rtHandleProperties);
             FrameData = new FrameData(camera, cull, viewportParams);
@@ -72,9 +71,10 @@ namespace Retrolight.Runtime {
             if (camera.clearFlags == CameraClearFlags.Skybox) {
                 context.DrawSkybox(camera);
             }
-            context.ExecuteCommandBuffer(cmd);/*
+            context.ExecuteCommandBuffer(cmd);
             context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
-            context.DrawGizmos(camera, GizmoSubset.PostImageEffects);*/
+            context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
+            
             CommandBufferPool.Release(cmd);
             context.Submit();
         }

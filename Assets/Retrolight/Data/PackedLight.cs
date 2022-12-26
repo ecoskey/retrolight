@@ -30,7 +30,7 @@ namespace Retrolight.Data {
         public PackedLight(VisibleLight light) {
             color32 = Mathf.FloatToHalf(light.finalColor.r) | (uint) Mathf.FloatToHalf(light.finalColor.g) << 16;
             color16_extra16 = Mathf.FloatToHalf(light.finalColor.b);
-            Vector3 dir = light.localToWorldMatrix.GetColumn(2);
+            Vector3 dir = -light.localToWorldMatrix.GetColumn(2);
             switch (light.lightType) {
                 case LightType.Directional:
                     position = Vector3.zero;

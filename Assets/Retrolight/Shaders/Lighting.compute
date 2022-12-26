@@ -6,6 +6,7 @@
 #include "../ShaderLibrary/Lighting.hlsl"
 #include "../ShaderLibrary/Viewport.hlsl"
 #include "../ShaderLibrary/Edges.hlsl"
+#include "../ShaderLibrary/Filtering.hlsl"
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
@@ -25,26 +26,32 @@ struct ThreadInfo {
     uint2 subId : SV_GroupThreadID;
 };
 
-float3 GetDeferredLighting(Light light, uint2 dispatchId) {
-    /*Surface surface;
-    surface.color = LoadAlbedo(dispatchId).rgb;
-    surface.position = WorldSpaceFromDepthCompute(dispatchId, Resolution.zw);
-    surface.normal = LoadNormal(dispatchId);
-    const float4 attributes = LoadAttributes(dispatchId);
+Surface GetSurfaceGBuffer(uint2 pos) {
+    Surface surface;
+    float4 albedo = LoadAlbedo(pos);
+    surface.color = albedo.rgb;
+    surface.alpha = albedo.a;
+    surface.position = WorldSpaceFromDepthCompute(pos, Resolution.zw);
+    surface.normal = LoadNormal(pos);
+    const float4 attributes = LoadAttributes(pos);
     surface.metallic = attributes.x;
     surface.smoothness = attributes.y;
     surface.depthEdgeStrength = attributes.z;
     surface.normalEdgeStrength = attributes.w;
-    surface.alpha = 1;
-    //surface.viewDir = _WorldSpaceCameraPos - surface.position;
-    const BRDF brdf = GetBRDF(surface, false);
-    return GetLighting(surface, brdf, light);*/
+    surface.viewDir = GetViewDirection(surface.position);
+    return surface;
+}
+
+float3 GetLighting(Surface surface, Light light, uint2 pos) {
+    const BrdfParams params = GetBrdfParams(surface);
+    return DirectBRDF(surface, params, light, pos);
 }
 
 [numthreads(8, 8, 1)]
 void Lighting(ThreadInfo input) {
     if (IsPixelOOB(input.dispatchId)) return;
-    /*const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
+    const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
+    const Surface surface = GetSurfaceGBuffer(input.dispatchId);
     float3 accLight = 0;
     UNITY_LOOP
     for (uint i = 0; i * BUCKET_SIZE < LightCount; i++) { 
@@ -54,8 +61,8 @@ void Lighting(ThreadInfo input) {
             const uint firstLightIndex = firstbitlow(bucket);
             ClearBit(bucket, firstLightIndex);
             const Light light = Lights[lightsOffset + firstLightIndex];
-            accLight += GetDeferredLighting(light, input.dispatchId);
+            accLight += GetLighting(surface, light, input.dispatchId);
         }
-    }*/
-    FinalColorTex[input.dispatchId] = LoadAlbedo(input.dispatchId);
+    }
+    FinalColorTex[input.dispatchId] = float4(accLight, surface.alpha);
 }

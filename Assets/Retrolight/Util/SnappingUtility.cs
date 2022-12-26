@@ -27,7 +27,7 @@ namespace Retrolight.Util {
             Vector3 newPixelPos = new Vector3(
                 Mathf.Round(pixelPos.x), 
                 Mathf.Round(pixelPos.y), 
-                Mathf.Round(pixelPos.z)
+                pixelPos.z
             );
             Vector3 newPos = camera.cameraToWorldMatrix.MultiplyVector(newPixelPos / scale);
             transform.position = newPos;
