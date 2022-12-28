@@ -24,10 +24,6 @@ struct BrdfParams {
     float roughness;
 };
 
-float3 GetViewDirection(float3 pos) {
-    return normalize(_WorldSpaceCameraPos - pos); //doesn't work for orthographic cameras
-}
-
 #define MIN_REFLECTIVITY 0.04
 
 float OneMinusReflectivity(float metallic) {
@@ -49,8 +45,21 @@ BrdfParams GetBrdfParams(Surface surface/*, bool applyAlphaToDiffuse = false*/) 
 }
 
 float3 IncomingLight(Surface surface, Light light, uint2 pos) {
-    float intensity = saturate(dot(surface.normal, light.Direction()));
-    return intensity * light.Color(); //integrate shadow/angle attenuation
+    float intensity;
+    switch (light.Type()) {
+        case DIRECTIONAL_LIGHT:
+            intensity = saturate(dot(surface.normal, light.Direction()));
+            return Quantize(Dither8(intensity, 0.05, pos), 6) * light.Color();
+        case POINT_LIGHT:
+            /*float3 dist = light.position - surface.position;
+            intensity = saturate(dot(surface.normal, normalize(dist)));
+            float attenuation = light.Range() / Length2(dist);
+            return intensity * attenuation * light.Color();*/
+        case SPOT_LIGHT:
+        default:
+            return 0;
+    }
+    
 }
 
 float3 DirectBRDF(Surface surface, BrdfParams params, Light light, uint2 pos) {
@@ -64,6 +73,7 @@ float3 DirectBRDF(Surface surface, BrdfParams params, Light light, uint2 pos) {
     const float normalization = params.roughness * 4.0 + 2.0;
     const float specularStrength = r2 / (d2 * max(0.1, lh2) * normalization);
     const float3 baseLitColor = specularStrength * params.baseSpecular + params.baseDiffuse;
+    //return specularStrength;
     return IncomingLight(surface, light, pos) * baseLitColor;
 }
 

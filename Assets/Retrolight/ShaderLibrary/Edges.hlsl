@@ -15,21 +15,21 @@ float3 LoadRelativeNormal(int2 pos, int2 offset) {
 
 float GetDepthEdgeIndicator(int2 pos, float depth) {
     float diff = 0;
-    diff += saturate(LoadRelativeEyeDepth(pos, int2(1, 0)) - depth);
-    diff += saturate(LoadRelativeEyeDepth(pos, int2(-1, 0)) - depth);
-    diff += saturate(LoadRelativeEyeDepth(pos, int2(0, 1)) - depth);
-    diff += saturate(LoadRelativeEyeDepth(pos, int2(0, -1)) - depth);
+    diff += clamp(LoadRelativeEyeDepth(pos, int2(1, 0)) - depth, 0, 1);
+    diff += clamp(LoadRelativeEyeDepth(pos, int2(-1, 0)) - depth, 0, 1);
+    diff += clamp(LoadRelativeEyeDepth(pos, int2(0, 1)) - depth, 0, 1);
+    diff += clamp(LoadRelativeEyeDepth(pos, int2(0, -1)) - depth, 0, 1);
     return floor(smoothstep(.1, .5, diff) * 2) / 2;
 }
 
-float NeighborNormalEdgeIndicator(int2 pos, int2 offset, float depth, float3 normal) {
+float NeighborNormalEdgeIndicator(int2 pos, const int2 offset, float depth, float3 normal) {
     const float depthDiff = LoadRelativeEyeDepth(pos, offset) - depth;
     const float3 neighborNormal = LoadRelativeNormal(pos, offset);
     
     // Edge pixels should yield to faces who's normals are closer to the bias normal.
     const float3 normalEdgeBias = float3(1, 1, 1);
     const float normalDiff = dot(normal - neighborNormal, normalEdgeBias);
-    const float normalIndicator = saturate(smoothstep(-.01, .01, normalDiff)); //removed clamping this between 0 and 1
+    const float normalIndicator = saturate(smoothstep(-.01, .01, normalDiff));
 
     // Only the shallower pixel should detect the normal edge.
     const float depthIndicator = saturate(sign(depthDiff * .25 + .0025));

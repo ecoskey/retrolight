@@ -20,6 +20,9 @@ namespace Retrolight.Runtime {
         private FinalPass FinalPass;
 
         public Retrolight(ShaderBundle shaderBundle, int pixelRatio) {
+            GraphicsSettings.lightsUseLinearIntensity = true;
+            GraphicsSettings.useScriptableRenderPipelineBatching = true;
+            
             //todo: enable SRP batcher, other graphics settings like linear light intensity
             RenderGraph = new RenderGraph("Retrolight Render Graph");
             ShaderBundle = shaderBundle;

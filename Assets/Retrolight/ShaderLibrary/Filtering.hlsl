@@ -25,7 +25,15 @@ static const int bayer8[8 * 8] = {
     63, 31, 55, 23, 61, 29, 53, 21
 };
 
-float3 Dither4(float3 value, float spread, uint2 pos) {
+float Dither2(float value, float spread, uint2 pos) {
+    uint2 matrixPos = pos % 2;
+    uint matrixIndex = matrixPos.y * 2 + matrixPos.x;
+    const int matrixValue = bayer2[matrixIndex];
+    const float normMatrixValue = matrixValue / 4.0f - 0.5f;
+    return value + normMatrixValue * spread;
+}
+
+float Dither4(float value, float spread, uint2 pos) {
     uint2 matrixPos = pos % 4;
     uint matrixIndex = matrixPos.y * 4 + matrixPos.x;
     const int matrixValue = bayer4[matrixIndex];
@@ -33,7 +41,7 @@ float3 Dither4(float3 value, float spread, uint2 pos) {
     return value + normMatrixValue * spread;
 }
 
-float3 Dither8(float3 value, float spread, uint2 pos) {
+float Dither8(float value, float spread, uint2 pos) {
     uint2 matrixPos = pos % 8;
     uint matrixIndex = matrixPos.y * 8 + matrixPos.x;
     const int matrixValue = bayer8[matrixIndex];
@@ -41,16 +49,8 @@ float3 Dither8(float3 value, float spread, uint2 pos) {
     return value + normMatrixValue * spread;
 }
 
-
-
 float3 Quantize(float3 value, int steps) {
     return floor(value * (steps - 1) + 0.5) / (steps - 1);
-}
-
-float DitherQuantize8(float value, float spread, int steps, uint2 pos) {
-    float quantized = Quantize(value, steps);
-    float diff = abs(value - quantized) * steps;
-    return Quantize(Dither8(value, (1 - diff) * spread, pos), steps);
 }
 
 #endif

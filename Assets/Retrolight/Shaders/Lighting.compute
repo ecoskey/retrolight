@@ -38,7 +38,7 @@ Surface GetSurfaceGBuffer(uint2 pos) {
     surface.smoothness = attributes.y;
     surface.depthEdgeStrength = attributes.z;
     surface.normalEdgeStrength = attributes.w;
-    surface.viewDir = GetViewDirection(surface.position);
+    surface.viewDir = normalize(_WorldSpaceCameraPos - surface.position);
     return surface;
 }
 
