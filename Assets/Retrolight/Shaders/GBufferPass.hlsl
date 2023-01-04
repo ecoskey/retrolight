@@ -9,20 +9,19 @@ SAMPLER(sampler_MainTex);
 TEXTURE2D(_NormalMap);
 
 UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
-UNITY_DEFINE_INSTANCED_PROP(float4, _MainColor)
-UNITY_DEFINE_INSTANCED_PROP(float4, _MainTex_ST)
-UNITY_DEFINE_INSTANCED_PROP(float, _NormalScale)
-UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
-UNITY_DEFINE_INSTANCED_PROP(float, _Metallic)
-UNITY_DEFINE_INSTANCED_PROP(float, _Smoothness)
-UNITY_DEFINE_INSTANCED_PROP(float, _DepthEdgeStrength)
-UNITY_DEFINE_INSTANCED_PROP(float, _NormalEdgeStrength)
+    UNITY_DEFINE_INSTANCED_PROP(float4, _MainColor)
+    UNITY_DEFINE_INSTANCED_PROP(float4, _MainTex_ST)
+    UNITY_DEFINE_INSTANCED_PROP(float, _NormalScale)
+    UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
+    UNITY_DEFINE_INSTANCED_PROP(float, _Metallic)
+    UNITY_DEFINE_INSTANCED_PROP(float, _Smoothness)
+    UNITY_DEFINE_INSTANCED_PROP(float, _DepthEdgeStrength)
+    UNITY_DEFINE_INSTANCED_PROP(float, _NormalEdgeStrength)
 UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 #define ACCESS_PROP(prop) UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, prop)
 
-struct VertexInput
-{
+struct VertexInput {
     float3 positionOS : POSITION;
     float3 normalOS : NORMAL;
     float4 tangentOS : TANGENT;
@@ -30,8 +29,7 @@ struct VertexInput
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-struct V2F
-{
+struct V2F {
     float4 positionCS : SV_Position;
     float3 normalWS : V2F_Normal;
     float4 tangentWS : V2F_Tangent;
@@ -39,8 +37,7 @@ struct V2F
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-struct GBufferOut
-{
+struct GBufferOut {
     float4 albedo : SV_Target0;
     float4 normal : SV_Target1;
     float4 attributes : SV_Target2;

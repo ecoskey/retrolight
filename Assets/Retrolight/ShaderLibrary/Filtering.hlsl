@@ -49,7 +49,7 @@ float Dither8(float value, float spread, uint2 pos) {
     return value + normMatrixValue * spread;
 }
 
-float3 Quantize(float3 value, int steps) {
+float Quantize(float value, int steps) {
     return floor(value * (steps - 1) + 0.5) / (steps - 1);
 }
 

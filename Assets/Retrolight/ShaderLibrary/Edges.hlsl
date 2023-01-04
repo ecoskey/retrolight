@@ -19,7 +19,7 @@ float GetDepthEdgeIndicator(int2 pos, float depth) {
     diff += clamp(LoadRelativeEyeDepth(pos, int2(-1, 0)) - depth, 0, 1);
     diff += clamp(LoadRelativeEyeDepth(pos, int2(0, 1)) - depth, 0, 1);
     diff += clamp(LoadRelativeEyeDepth(pos, int2(0, -1)) - depth, 0, 1);
-    return floor(smoothstep(.1, .5, diff) * 2) / 2;
+    return floor(smoothstep(.1, .2, diff) * 2) / 2;
 }
 
 float NeighborNormalEdgeIndicator(int2 pos, const int2 offset, float depth, float3 normal) {

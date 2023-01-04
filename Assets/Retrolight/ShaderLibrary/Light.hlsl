@@ -12,7 +12,7 @@
 struct Light {
     float3 position;
     uint type16_range16; //flags are currently unused, possibly layer mask?
-    uint2 color48_extra16; //packed half3 color and half precision extra float
+    uint2 color48_cosAngle16; //packed half3 color and half precision extra float
     uint2 direction; //unused half of y component
 
     uint Type() {
@@ -25,14 +25,14 @@ struct Light {
 
     float3 Color() {
         return float3(
-            f16tof32(color48_extra16.x),
-            f16tof32(color48_extra16.x >> 16),
-            f16tof32(color48_extra16.y)
+            f16tof32(color48_cosAngle16.x),
+            f16tof32(color48_cosAngle16.x >> 16),
+            f16tof32(color48_cosAngle16.y)
         );
     }
 
-    float Extra() {
-        return f16tof32(color48_extra16.y >> 16);
+    float CosAngle() {
+        return f16tof32(color48_cosAngle16.y >> 16);
     }
 
     float3 Direction() {

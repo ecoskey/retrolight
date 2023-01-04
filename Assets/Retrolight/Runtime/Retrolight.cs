@@ -4,6 +4,9 @@ using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using Retrolight.Runtime.Passes;
 using Retrolight.Util;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace Retrolight.Runtime {
     public sealed class Retrolight : RenderPipeline {
@@ -13,26 +16,26 @@ namespace Retrolight.Runtime {
         internal FrameData FrameData { get; private set; }
 
         //render passes
-        private SetupPass SetupPass;
-        private GBufferPass GBufferPass;
-        private LightingPass LightingPass;
-        private TransparentPass TransparentPass;
-        private FinalPass FinalPass;
+        private SetupPass setupPass;
+        private GBufferPass gBufferPass;
+        private LightingPass lightingPass;
+        private TransparentPass transparentPass;
+        private FinalPass finalPass;
 
         public Retrolight(ShaderBundle shaderBundle, int pixelRatio) {
+            //todo: enable SRP batcher, other graphics settings like linear light intensity
             GraphicsSettings.lightsUseLinearIntensity = true;
             GraphicsSettings.useScriptableRenderPipelineBatching = true;
-            
-            //todo: enable SRP batcher, other graphics settings like linear light intensity
+
             RenderGraph = new RenderGraph("Retrolight Render Graph");
             ShaderBundle = shaderBundle;
             PixelRatio = pixelRatio;
 
-            SetupPass = new SetupPass(this);
-            GBufferPass = new GBufferPass(this);
-            LightingPass = new LightingPass(this);
-            TransparentPass = new TransparentPass(this);
-            FinalPass = new FinalPass(this);
+            setupPass = new SetupPass(this);
+            gBufferPass = new GBufferPass(this);
+            lightingPass = new LightingPass(this);
+            transparentPass = new TransparentPass(this);
+            finalPass = new FinalPass(this);
 
             Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
             RTHandles.Initialize(Screen.width / PixelRatio, Screen.height / PixelRatio);
@@ -75,37 +78,44 @@ namespace Retrolight.Runtime {
                 context.DrawSkybox(camera);
             }
             context.ExecuteCommandBuffer(cmd);
-            context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
-            context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
+            #if UNITY_EDITOR
+            if (
+                SceneView.currentDrawingSceneView is not null &&
+                SceneView.currentDrawingSceneView.camera is not null && 
+                SceneView.currentDrawingSceneView.camera == camera
+            ) {
+                context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
+                context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
+            }
+            #endif
             
             CommandBufferPool.Release(cmd);
             context.Submit();
         }
 
         private void RenderPasses(Vector2 viewportShift) {
-            SetupPass.Run();
-            var gBuffer = GBufferPass.Run();
-            var finalColorTex = LightingPass.Run(gBuffer);
-            TransparentPass.Run(gBuffer, finalColorTex);
+            setupPass.Run();
+            var gBuffer = gBufferPass.Run();
+            var finalColorTex = lightingPass.Run(gBuffer);
+            transparentPass.Run(gBuffer, finalColorTex);
             //PostProcessPass -> writes to final color buffer after all other shaders
-            FinalPass.Run(finalColorTex, viewportShift);
+            finalPass.Run(finalColorTex, viewportShift);
         }
 
         protected override void Dispose(bool disposing) {
             if (!disposing) return;
 
-            SetupPass.Dispose();
-            GBufferPass.Dispose();
-            LightingPass.Dispose();
-            TransparentPass.Dispose();
-            FinalPass.Dispose();
+            setupPass.Dispose();
+            gBufferPass.Dispose();
+            lightingPass.Dispose();
+            transparentPass.Dispose();
+            finalPass.Dispose();
 
-            SetupPass = null;
-            GBufferPass = null;
-            LightingPass = null;
-            TransparentPass = null;
-            FinalPass = null;
-            
+            setupPass = null;
+            gBufferPass = null;
+            lightingPass = null;
+            transparentPass = null;
+            finalPass = null;
 
             Blitter.Cleanup();
             RenderGraph.Cleanup();

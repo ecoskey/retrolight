@@ -42,7 +42,7 @@ Capsule LineLightCullVolume(Light light) {
     Capsule volume;
     volume.a = light.position;
     volume.b = light.position + light.Direction() * light.Range();
-    volume.r = light.Extra();
+    volume.r = light.CosAngle();
     return volume;
 }
 

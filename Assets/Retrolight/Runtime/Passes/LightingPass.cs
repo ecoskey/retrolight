@@ -79,10 +79,14 @@ namespace Retrolight.Runtime.Passes {
             }
             context.cmd.SetBufferData(passData.LightBuffer, packedLights, 0, 0, passData.LightCount);
             packedLights.Dispose();
-            
+
             context.cmd.SetGlobalInt(lightCountId, passData.LightCount);
             context.cmd.SetGlobalBuffer(lightBufferId, passData.LightBuffer);
             context.cmd.SetGlobalBuffer(cullingResultsId, passData.CullingResultsBuffer);
+            
+            context.cmd.SetComputeMatrixParam(shaderBundle.LightingShader, "unity_MatrixV", camera.worldToCameraMatrix);
+            context.cmd.SetComputeMatrixParam(shaderBundle.LightingShader, "unity_MatrixInvVP", (GL.GetGPUProjectionMatrix(camera.projectionMatrix, true) * camera.worldToCameraMatrix).inverse);
+            context.cmd.SetComputeVectorParam(shaderBundle.LightingShader, "_WorldSpaceCameraPos", camera.transform.position);
 
             context.cmd.DispatchCompute(
                 shaderBundle.LightCullingShader, lightCullingKernelId,
