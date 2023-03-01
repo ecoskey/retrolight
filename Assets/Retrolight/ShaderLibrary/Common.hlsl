@@ -13,6 +13,8 @@
 #define UNITY_MATRIX_VP unity_MatrixVP
 #define UNITY_MATRIX_I_VP unity_MatrixInvVP
 #define UNITY_MATRIX_P glstate_matrix_projection
+#define UNITY_MATRIX_I_P unity_MatrixInvP
+
 
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/UnityInstancing.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
@@ -46,7 +48,7 @@ float3 DecodeNormal(float4 sample, float scale) {
 }
 
 float3 NormalTangentToWorld(float3 normalTS, float3 normalWS, float4 tangentWS) {
-    float3x3 tangentToWorld = CreateTangentToWorld(normalWS, tangentWS.xyz, tangentWS.w);
+    const float3x3 tangentToWorld = CreateTangentToWorld(normalWS, tangentWS.xyz, tangentWS.w);
     return TransformTangentToWorld(normalTS, tangentToWorld);
 }
 

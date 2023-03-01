@@ -39,7 +39,7 @@ namespace Retrolight.Runtime {
 
             Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
             RTHandles.Initialize(Screen.width / PixelRatio, Screen.height / PixelRatio);
-            RTHandles.ResetReferenceSize(Screen.width / PixelRatio, Screen.height / PixelRatio);
+            //RTHandles.ResetReferenceSize(Screen.width / PixelRatio, Screen.height / PixelRatio);
         }
 
         protected override void Render(ScriptableRenderContext context, Camera[] cameras) {

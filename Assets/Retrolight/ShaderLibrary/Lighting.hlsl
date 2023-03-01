@@ -69,8 +69,8 @@ BRDFParams GetBRDFParams(
 
     const float edgeStrength =
         edges.x > 0.0 ?
-            (1.0 - surface.depthEdgeStrength * edges.x) :
-            (1.0 + surface.normalEdgeStrength * edges.y);
+            1.0 - surface.depthEdgeStrength  * edges.x:
+            1.0 + surface.normalEdgeStrength * edges.y;
 
     float3 relativeLightPos;
     switch (light.Type()) {
@@ -117,7 +117,7 @@ float3 DirectBRDF(const BRDFParams params) {
     const float r2 = Sq(params.roughness);
     const float d2 = Sq(float(nh2 * (r2 - 1.0) + 1.00001)); //todo: check if this is right
     const float normalization = params.roughness * 4.0 + 2.0;
-    const float specularStrength = r2 / (d2 * max(0.1, lh2) * normalization);
+    float specularStrength = r2 / (d2 * max(0.1, lh2) * normalization);
     const float3 baseLitColor = specularStrength * params.baseSpecular + params.baseDiffuse;
     return params.lightColor * params.attenuation * baseLitColor;
 }

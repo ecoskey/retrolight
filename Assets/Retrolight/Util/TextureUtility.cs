@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
-using UColor = UnityEngine.Color;
 
 namespace Retrolight.Util {
     public static class TextureUtility {
@@ -24,7 +23,7 @@ namespace Retrolight.Util {
             colorFormat = format,
             depthBufferBits = DepthBits.None,
             clearBuffer = true,
-            clearColor = UColor.clear,
+            clearColor = Color.clear,
             enableRandomWrite = false,
             filterMode = FilterMode.Point,
             msaaSamples = MSAASamples.None,

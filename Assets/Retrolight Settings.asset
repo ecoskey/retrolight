@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 320b90b11360c2eafa2a76f1f3366098, type: 3}
   m_Name: Retrolight Settings
   m_EditorClassIdentifier: 
-  pixelRatio: 4
+  pixelRatio: 3

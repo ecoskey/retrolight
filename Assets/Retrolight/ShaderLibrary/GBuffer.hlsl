@@ -31,7 +31,7 @@ float OrthoEyeDepth(float depth) {
 float Sample01Depth(float2 uv) {
     const float rawDepth = SAMPLE_DEPTH_TEXTURE(DepthTex, DEFAULT_SAMPLER, uv);
     if (ORTHOGRAPHIC_CAMERA) return Ortho01Depth(rawDepth);
-    return Linear01DepthFromNear(rawDepth, _ZBufferParams);
+    return Linear01Depth(rawDepth, _ZBufferParams);
 }
 
 float Load01Depth(uint2 pos) {

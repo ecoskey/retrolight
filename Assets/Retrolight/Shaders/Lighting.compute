@@ -7,8 +7,6 @@
 #include "../ShaderLibrary/Viewport.hlsl"
 #include "../ShaderLibrary/Edges.hlsl"
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
 #define BUCKET_SIZE 32
 #define TILE_BUCKET_COUNT (MAX_LIGHTS / BUCKET_SIZE)
 
