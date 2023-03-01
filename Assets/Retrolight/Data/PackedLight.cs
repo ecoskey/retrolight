@@ -10,21 +10,19 @@ namespace Retrolight.Data {
 
         private uint type16_range16;
 
-        //todo: hopefully hlsl structs are packed in a way to make this work
         private uint color32, color16_cosAngle16;
         private uint direction0, direction1;
 
         public const int Stride =
             sizeof(float) * 3 +
             sizeof(uint) +
-            sizeof(int) * 2 +
-            sizeof(int) * 2;
+            sizeof(uint) * 2 +
+            sizeof(uint) * 2;
 
         private enum PackedLightType {
             Directional = 0,
             Point = 1,
             Spot = 2,
-            Line = 3
         }
 
         public PackedLight(VisibleLight light) {
