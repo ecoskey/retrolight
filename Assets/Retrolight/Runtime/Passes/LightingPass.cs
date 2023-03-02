@@ -3,6 +3,7 @@ using Retrolight.Data;
 using Retrolight.Util;
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
@@ -20,12 +21,13 @@ namespace Retrolight.Runtime.Passes {
         private readonly int lightCullingKernelId, lightingKernelId;
 
         public class LightingPassData {
-            public NativeArray<VisibleLight> Lights;
+            public NativeArray<PackedLight> Lights;
             public int LightCount;
             public Vector2Int TileCount;
             public ComputeBufferHandle LightBuffer;
             public ComputeBufferHandle CullingResultsBuffer;
             public TextureHandle FinalColorTex;
+            public TextureHandle ShadowAtlas;
         }
 
         public LightingPass(Retrolight pipeline) : base(pipeline) {
@@ -37,10 +39,18 @@ namespace Retrolight.Runtime.Passes {
 
         public TextureHandle Run(GBuffer gBuffer) {
             using var builder = CreatePass(out var passData);
-
             gBuffer.ReadAll(builder);
+            
+            //todo: this is a lot of allocation/deallocation each frame
+            NativeArray<PackedLight> packedLights = new NativeArray<PackedLight>(
+                maximumLights, Allocator.Temp,
+                NativeArrayOptions.UninitializedMemory
+            );
+            for (int i = 0; i < passData.LightCount; i++) {
+                packedLights[i] = new PackedLight(cull.visibleLights[i]);
+            }
+            passData.Lights = packedLights;
 
-            passData.Lights = cull.visibleLights;
             int lightCount = Math.Min(passData.Lights.Length, maximumLights);
             passData.LightCount = lightCount;
 
@@ -51,6 +61,18 @@ namespace Retrolight.Runtime.Passes {
                 type = ComputeBufferType.Structured
             };
             passData.LightBuffer = CreateWriteComputeBuffer(builder, lightsDesc);
+
+            var shadowAtlasDesc = renderGraph.CreateTexture(new TextureDesc(32, 32) { //todo: set width correctly
+                colorFormat = GraphicsFormat.None,
+                depthBufferBits = DepthBits.Depth32,
+                clearBuffer = true,
+                enableRandomWrite = false,
+                filterMode = FilterMode.Point,
+                msaaSamples = MSAASamples.None,
+                useDynamicScale = false,
+                name = "Directional Shadow Atlas"
+            });
+            passData.ShadowAtlas = builder.WriteTexture(shadowAtlasDesc);
 
             var cullingResultsDesc = new ComputeBufferDesc(
                 Mathf.CeilToInt(maximumLights / 32f) * viewportParams.TileCount.x * viewportParams.TileCount.y,
@@ -69,6 +91,7 @@ namespace Retrolight.Runtime.Passes {
             return finalColorTex;
         }
 
+        //todo: work on async compute stuff?
         protected override void Render(LightingPassData passData, RenderGraphContext context) {
             //todo: async compute to do shadows and light culling at the same time?
             //SHADOWS

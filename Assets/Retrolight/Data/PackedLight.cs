@@ -16,14 +16,13 @@ namespace Retrolight.Data {
         public const int Stride =
             sizeof(float) * 3 +
             sizeof(uint) +
-            sizeof(int) * 2 +
-            sizeof(int) * 2;
+            sizeof(uint) * 2 +
+            sizeof(uint) * 2;
 
         private enum PackedLightType : byte {
             Directional = 0,
             Point = 1,
             Spot = 2,
-            Line = 3
         }
 
         [Flags]

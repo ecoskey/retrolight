@@ -1,3 +1,4 @@
+using System;
 using Retrolight.Data;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
@@ -60,7 +61,7 @@ namespace Retrolight.Runtime {
             var viewportParams = new ViewportParams(RTHandles.rtHandleProperties);
             FrameData = new FrameData(camera, cull, viewportParams);
             
-            using var snapContext = SnappingUtility.Snap(camera, camera.transform, viewportParams);
+            using var snapContext = SnappingUtility.Snap(camera, camera.transform, viewportParams); //todo: move to FrameData
 
             context.SetupCameraProperties(camera);
 
@@ -70,17 +71,20 @@ namespace Retrolight.Runtime {
                 commandBuffer = cmd,
                 currentFrameIndex = Time.frameCount,
             };
-            using (RenderGraph.RecordAndExecute(renderGraphParams)) {
-                RenderPasses(snapContext.ViewportShift);
-            }
-            
+            using (RenderGraph.RecordAndExecute(renderGraphParams)) { RenderPasses(snapContext.ViewportShift); }
 
-            if (camera.clearFlags == CameraClearFlags.Skybox) {
-                context.DrawSkybox(camera);
+            switch (camera.clearFlags) {
+                case CameraClearFlags.Skybox:  
+                    context.DrawSkybox(camera);
+                    break;
+                case CameraClearFlags.Color:   break;
+                case CameraClearFlags.Depth:   break;
+                case CameraClearFlags.Nothing: break;
+                default: throw new ArgumentOutOfRangeException();
             }
             
             context.ExecuteCommandBuffer(cmd);
-            #if UNITY_EDITOR
+            #if UNITY_EDITOR //todo: is this the right way to do this?
             if (
                 SceneView.currentDrawingSceneView is not null &&
                 SceneView.currentDrawingSceneView.camera is not null && 
