@@ -73,10 +73,12 @@ namespace Retrolight.Runtime {
             using (RenderGraph.RecordAndExecute(renderGraphParams)) {
                 RenderPasses(snapContext.ViewportShift);
             }
+            
 
             if (camera.clearFlags == CameraClearFlags.Skybox) {
                 context.DrawSkybox(camera);
             }
+            
             context.ExecuteCommandBuffer(cmd);
             #if UNITY_EDITOR
             if (

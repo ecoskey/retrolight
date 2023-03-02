@@ -8,58 +8,78 @@
 #define SPOT_LIGHT 2
 #define LINE_LIGHT 3
 
+#define F_LIGHT_SHADOWED 1
+
 //todo: look into utilities in Core RP lib Packing.hlsl 
 struct Light {
     float3 position;
-    uint type16_range16; //flags are currently unused, possibly layer mask?
-    uint2 color48_cosAngle16; //packed half3 color and half precision extra float
-    uint2 direction; //unused half of y component
+    uint type2_flags6_shadowIndex8_range16; //flags are currently unused, possibly layer mask?
+
+    #if REAL_IS_HALF
+        half3 color;
+        half cosAngle;
+        half3 direction;
+        half shadowStrength;
+    #else
+        uint2 color48_cosAngle16; //packed half3 color and half precision cosine of spotlight angle
+        uint2 direction48_shadowStrength16; //packed half3 direction and half precision normalized strength of shadow
+    #endif
 
     uint Type() {
-        return type16_range16 & 0xFF;
+        return type2_flags6_shadowIndex8_range16 & 0xFF;
     }
 
-    float Range() {
-        return f16tof32(type16_range16 >> 16);
+    uint Flags() {
+        return type2_flags6_shadowIndex8_range16 >> 2 & 0x3F;
     }
 
-    float3 Color() {
-        return float3(
-            f16tof32(color48_cosAngle16.x),
-            f16tof32(color48_cosAngle16.x >> 16),
-            f16tof32(color48_cosAngle16.y)
-        );
+    uint ShadowIndex() {
+        return type2_flags6_shadowIndex8_range16 >> 8 & 0xFF;
     }
 
-    float CosAngle() {
-        return f16tof32(color48_cosAngle16.y >> 16);
+    real Range() {
+        return f16tof32(type2_flags6_shadowIndex8_range16 >> 16);
     }
 
-    float3 Direction() {
-        return float3(
-            f16tof32(direction.x),
-            f16tof32(direction.x >> 16),
-            f16tof32(direction.y)
-        );
+    real3 Color() {
+        #if REAL_IS_HALF
+            return color;
+        #else
+            return float3(
+                f16tof32(color48_cosAngle16.x),
+                f16tof32(color48_cosAngle16.x >> 16),
+                f16tof32(color48_cosAngle16.y)
+            );
+        #endif
+    }
+
+    real CosAngle() {
+        #if REAL_IS_HALF
+            return cosAngle;
+        #else
+            return f16tof32(color48_cosAngle16.y >> 16);
+        #endif
+    }
+
+    real3 Direction() {
+        #if REAL_IS_HALF
+            return direction;
+        #else
+            return float3(
+                f16tof32(direction48_shadowStrength16.x),
+                f16tof32(direction48_shadowStrength16.x >> 16),
+                f16tof32(direction48_shadowStrength16.y)
+            );
+        #endif
+    }
+    
+    real ShadowStrength() {
+        #if REAL_IS_HALF
+            return shadowStrength
+        #else
+            return f16tof32(direction48_shadowStrength16.z >> 16);
+        #endif
     }
 };
-
-/*Light DirectionalLight(float3 color, float3 direction) {
-    Light light;
-    light.position = 0;
-    light.type16_range16 = DIRECTIONAL_LIGHT;
-    light.color48_extra16 = PackFloat3(color);
-    light.direction = PackFloat3(direction);
-    return light;
-}
-
-Light PointLight(float3 position, float3 color, float range) {
-    Light light;
-    light.position = position;
-    light.type16_range16 = POINT_LIGHT | f32tof16(range) << 16;
-    light.color48_extra16 = PackFloat3(color);
-    light.direction = 0;
-    return light;
-}*/
 
 #endif

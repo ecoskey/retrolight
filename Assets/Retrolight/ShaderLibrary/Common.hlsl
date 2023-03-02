@@ -23,6 +23,8 @@
 #define ORTHOGRAPHIC_CAMERA unity_OrthoParams.w
 #define DEFAULT_SAMPLER sampler_PointClamp
 
+#define ACCESS_PROP(prop) UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, prop)
+
 SAMPLER(sampler_PointClamp);
 
 uint2 PackFloat3(float3 src) {

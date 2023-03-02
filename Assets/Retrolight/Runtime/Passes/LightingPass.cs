@@ -9,6 +9,7 @@ using UnityEngine.Rendering;
 namespace Retrolight.Runtime.Passes {
     public class LightingPass : RenderPass<LightingPass.LightingPassData> {
         private const int maximumLights = 1024;
+        private const int maxDirectionalShadows = 1;
 
         private static readonly int
             lightCountId = Shader.PropertyToID("LightCount"),
@@ -69,13 +70,18 @@ namespace Retrolight.Runtime.Passes {
         }
 
         protected override void Render(LightingPassData passData, RenderGraphContext context) {
+            //todo: async compute to do shadows and light culling at the same time?
+            //SHADOWS
+            
+            
+            // LIGHTS
             //todo: this is a lot of allocation/deallocation each frame
             NativeArray<PackedLight> packedLights = new NativeArray<PackedLight>(
                 maximumLights, Allocator.Temp,
                 NativeArrayOptions.UninitializedMemory
             );
             for (int i = 0; i < passData.LightCount; i++) {
-                packedLights[i] = new PackedLight(passData.Lights[i]);
+                packedLights[i] = new PackedLight(passData.Lights[i], 0); //todo: VERY BAD FIX THAT ZERO
             }
             context.cmd.SetBufferData(passData.LightBuffer, packedLights, 0, 0, passData.LightCount);
             packedLights.Dispose();
