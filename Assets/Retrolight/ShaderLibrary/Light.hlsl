@@ -1,12 +1,13 @@
 #ifndef RETROLIGHT_LIGHT_INCLUDED
 #define RETROLIGHT_LIGHT_INCLUDED
 
+#include "Common.hlsl"
+
 #define MAX_LIGHTS 1024
 
 #define DIRECTIONAL_LIGHT 0
 #define POINT_LIGHT 1
 #define SPOT_LIGHT 2
-#define LINE_LIGHT 3
 
 #define F_LIGHT_SHADOWED 1
 
@@ -26,7 +27,7 @@ struct Light {
     #endif
 
     uint Type() {
-        return type2_flags6_shadowIndex8_range16 & 0xFF;
+        return type2_flags6_shadowIndex8_range16 & 0x03;
     }
 
     uint Flags() {
@@ -77,7 +78,7 @@ struct Light {
         #if REAL_IS_HALF
             return shadowStrength
         #else
-            return f16tof32(direction48_shadowStrength16.z >> 16);
+            return f16tof32(direction48_shadowStrength16.y >> 16);
         #endif
     }
 };

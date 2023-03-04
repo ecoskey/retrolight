@@ -4,6 +4,7 @@
 #include "Common.hlsl"
 #include "Light.hlsl"
 #include "Filtering.hlsl"
+#include "Shadows.hlsl"
 
 struct Surface {
     float3 color;
@@ -79,6 +80,8 @@ BRDFParams GetBRDFParams(
             params.attenuation = saturate(dot(params.normal, params.lightDir));
             params.attenuation = Quantize(Dither8(params.attenuation, 0.05, positionInputs.positionSS), 8);
             params.attenuation *= edgeStrength;
+            //if (light.Flags() & F_LIGHT_SHADOWED)
+                //params.attenuation *= GetDirectionalShadowAttenuation(positionInputs.positionWS, light.ShadowStrength());
             break;
         case POINT_LIGHT:
             relativeLightPos = light.position - positionInputs.positionWS;

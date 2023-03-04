@@ -28,15 +28,7 @@ struct V2F {
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-float3 GetNormalTS(float2 baseUV)
-{
-    float4 map = SAMPLE_TEXTURE2D(_NormalMap, sampler_MainTex, baseUV);
-    float scale = ACCESS_PROP(_NormalScale);
-    float3 normal = DecodeNormal(map, scale);
-    return normal;
-}
-
-V2F GBufferVertex(VertexInput input)
+V2F ShadowCasterVertex(VertexInput input)
 {
     V2F output;
     UNITY_SETUP_INSTANCE_ID(input);
@@ -47,15 +39,13 @@ V2F GBufferVertex(VertexInput input)
     return output;
 }
 
-void GBufferFragment(V2F input)
+void ShadowCasterFragment(V2F input)
 {
     UNITY_SETUP_INSTANCE_ID(input);
     float4 baseMap = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
     float4 baseColor = ACCESS_PROP(_MainColor);
     float4 color = baseMap * baseColor;
     clip(color.a - ACCESS_PROP(_Cutoff));
-
-    return output;
 }
 
 #endif

@@ -6,7 +6,9 @@ Shader "Retrolight/StandardOpaque" {
 		[Normal] [NoScaleOffset] _NormalMap ("Normal Map", 2D) = "bump" {}
 		_NormalScale("Normal Scale", Range(0, 1)) = 1
 		
+		
 		_Cutoff ("Alpha Cutoff", Range(0, 1)) = 0.0
+		
 		_Metallic ("Metallic", Range(0, 1)) = 0.0
 		_Smoothness ("Smoothness", Range(0, 1)) = 0.5
 		
@@ -39,10 +41,9 @@ Shader "Retrolight/StandardOpaque" {
 
 			HLSLPROGRAM
 			#pragma target 3.5
-			#pragma shader_feature _CLIPPING
 			#pragma multi_compile_instancing
-			#pragma vertex ShadowCasterPassVertex
-			#pragma fragment ShadowCasterPassFragment
+			#pragma vertex ShadowCasterVertex
+			#pragma fragment ShadowCasterFragment
 			#include "ShadowCasterPass.hlsl"
 			ENDHLSL
 		}

@@ -29,6 +29,7 @@ namespace Retrolight.Runtime {
             GraphicsSettings.useScriptableRenderPipelineBatching = true;
 
             RenderGraph = new RenderGraph("Retrolight Render Graph");
+            RenderGraph.RegisterDebug();
             ShaderBundle = shaderBundle;
             PixelRatio = pixelRatio;
 
@@ -56,11 +57,17 @@ namespace Retrolight.Runtime {
 
         private void RenderCamera(ScriptableRenderContext context, Camera camera) {
             if (!camera.TryGetCullingParameters(out var cullingParams)) return;
+            //TODO: SET THIS FROM CONFIG PLEASE PLEASE PLEASE PLEASE PLEASE
+            //TODO: SET THIS FROM CONFIG PLEASE PLEASE PLEASE PLEASE PLEASE
+            //TODO: SET THIS FROM CONFIG PLEASE PLEASE PLEASE PLEASE PLEASE
+            //TODO: SET THIS FROM CONFIG PLEASE PLEASE PLEASE PLEASE PLEASE
+            //cullingParams.shadowDistance = Mathf.Min(maxShadowDistance, camera.farClipPlane);
+            //cullingParams.shadowDistance = 100; //TODO: SET THIS FROM CONFIG PLEASE PLEASE PLEASE PLEASE PLEASE
             CullingResults cull = context.Cull(ref cullingParams);
             RTHandles.SetReferenceSize(camera.pixelWidth / PixelRatio, camera.pixelHeight / PixelRatio);
             var viewportParams = new ViewportParams(RTHandles.rtHandleProperties);
             FrameData = new FrameData(camera, cull, viewportParams);
-            
+
             using var snapContext = SnappingUtility.Snap(camera, camera.transform, viewportParams); //todo: move to FrameData
 
             context.SetupCameraProperties(camera);
@@ -103,7 +110,7 @@ namespace Retrolight.Runtime {
             setupPass.Run();
             var gBuffer = gBufferPass.Run();
             var finalColorTex = lightingPass.Run(gBuffer);
-            transparentPass.Run(gBuffer, finalColorTex);
+            //transparentPass.Run(gBuffer, finalColorTex);
             //PostProcessPass -> writes to final color buffer after all other shaders
             finalPass.Run(finalColorTex, viewportShift);
         }
@@ -124,6 +131,7 @@ namespace Retrolight.Runtime {
             finalPass = null;
 
             Blitter.Cleanup();
+            RenderGraph.UnRegisterDebug();
             RenderGraph.Cleanup();
             RenderGraph = null;
         }
