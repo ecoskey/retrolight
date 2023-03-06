@@ -78,7 +78,21 @@ namespace Retrolight.Runtime {
                 commandBuffer = cmd,
                 currentFrameIndex = Time.frameCount,
             };
-            using (RenderGraph.RecordAndExecute(renderGraphParams)) { RenderPasses(snapContext.ViewportShift); }
+            
+            using (RenderGraph.RecordAndExecute(renderGraphParams)) {
+                var lightingData = setupPass.Run();
+                
+                //todo: dumb, instead you should be able to render shadows/set properties inside a command buffer
+                /*context.ExecuteCommandBuffer(cmd);
+                cmd.Clear();
+                context.SetupCameraProperties(camera);*/
+                
+                var gBuffer = gBufferPass.Run();
+                var finalColorTex = lightingPass.Run(gBuffer, lightingData);
+                //transparentPass.Run(gBuffer, finalColorTex);
+                //PostProcessPass -> writes to final color buffer after all other shaders
+                finalPass.Run(finalColorTex, snapContext.ViewportShift);
+            }
 
             switch (camera.clearFlags) {
                 case CameraClearFlags.Skybox:  
@@ -104,15 +118,6 @@ namespace Retrolight.Runtime {
             
             CommandBufferPool.Release(cmd);
             context.Submit();
-        }
-
-        private void RenderPasses(Vector2 viewportShift) {
-            setupPass.Run();
-            var gBuffer = gBufferPass.Run();
-            var finalColorTex = lightingPass.Run(gBuffer);
-            //transparentPass.Run(gBuffer, finalColorTex);
-            //PostProcessPass -> writes to final color buffer after all other shaders
-            finalPass.Run(finalColorTex, viewportShift);
         }
 
         protected override void Dispose(bool disposing) {
