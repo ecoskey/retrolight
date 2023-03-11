@@ -29,7 +29,6 @@ namespace Retrolight.Runtime {
             GraphicsSettings.useScriptableRenderPipelineBatching = true;
 
             RenderGraph = new RenderGraph("Retrolight Render Graph");
-            RenderGraph.RegisterDebug();
             ShaderBundle = shaderBundle;
             PixelRatio = pixelRatio;
 
