@@ -36,7 +36,7 @@ namespace Retrolight.Runtime.Passes {
             finalColorDesc.enableRandomWrite = true;
             
             var cullingResultsDesc = new ComputeBufferDesc(
-                Mathf.CeilToInt(lightInfo.LightCount / 32f) * 
+                Mathf.CeilToInt(Constants.MaximumLights / 32f) * 
                     viewportParams.TileCount.x * viewportParams.TileCount.y,
                 sizeof(uint)
             ) {

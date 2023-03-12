@@ -30,7 +30,7 @@ namespace Retrolight.Runtime.Passes {
             
             int lightCount = Math.Min(passData.Lights.Length, Constants.MaximumLights);
             
-            var lightsDesc = new ComputeBufferDesc(lightCount, PackedLight.Stride) {
+            var lightsDesc = new ComputeBufferDesc(Constants.MaximumLights, PackedLight.Stride) {
                 name = "Lights",
                 type = ComputeBufferType.Structured
             };
