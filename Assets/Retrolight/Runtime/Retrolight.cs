@@ -27,8 +27,9 @@ namespace Retrolight.Runtime {
             //todo: enable SRP batcher, other graphics settings like linear light intensity
             GraphicsSettings.lightsUseLinearIntensity = true;
             GraphicsSettings.useScriptableRenderPipelineBatching = true;
-
+            
             RenderGraph = new RenderGraph("Retrolight Render Graph");
+            //RenderGraph.RegisterDebug();
             ShaderBundle = shaderBundle;
             PixelRatio = pixelRatio;
 
@@ -79,7 +80,7 @@ namespace Retrolight.Runtime {
             };
             
             using (RenderGraph.RecordAndExecute(renderGraphParams)) {
-                var lightingData = setupPass.Run();
+                var lights = setupPass.Run();
                 
                 //todo: dumb, instead you should be able to render shadows/set properties inside a command buffer
                 /*context.ExecuteCommandBuffer(cmd);
@@ -87,10 +88,10 @@ namespace Retrolight.Runtime {
                 context.SetupCameraProperties(camera);*/
                 
                 var gBuffer = gBufferPass.Run();
-                var finalColorTex = lightingPass.Run(gBuffer, lightingData);
+                var lightingData = lightingPass.Run(gBuffer, lights);
                 //transparentPass.Run(gBuffer, finalColorTex);
                 //PostProcessPass -> writes to final color buffer after all other shaders
-                finalPass.Run(finalColorTex, snapContext.ViewportShift);
+                finalPass.Run(lightingData.FinalColorTex, snapContext.ViewportShift);
             }
 
             switch (camera.clearFlags) {
@@ -135,7 +136,7 @@ namespace Retrolight.Runtime {
             finalPass = null;
 
             Blitter.Cleanup();
-            RenderGraph.UnRegisterDebug();
+            //RenderGraph.UnRegisterDebug();
             RenderGraph.Cleanup();
             RenderGraph = null;
         }
