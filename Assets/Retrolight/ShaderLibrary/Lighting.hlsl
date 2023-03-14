@@ -64,9 +64,10 @@ BRDFParams GetBRDFParams(
     params.roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 
     params.lightColor = light.Color();
-    //todo: this doesn't work for orthographic cameras
-    //ideally, this would be a matrix multiplication by the 
-    params.viewDir = normalize(-GetCameraRelativePositionWS(positionInputs.positionWS));
+    
+    params.viewDir = ORTHOGRAPHIC_CAMERA ?
+        UNITY_MATRIX_I_V[2] :
+        normalize(-GetCameraRelativePositionWS(positionInputs.positionWS));
 
     const float edgeStrength =
         edges.x > 0.0 ?
@@ -122,6 +123,15 @@ float3 DirectBRDF(const BRDFParams params) {
     const float normalization = params.roughness * 4.0 + 2.0;
     float specularStrength = r2 / (d2 * max(0.1, lh2) * normalization);
     const float3 baseLitColor = specularStrength * params.baseSpecular + params.baseDiffuse;
+    return params.lightColor * params.attenuation * baseLitColor;
+}
+
+float3 CartoonBRDF(const BRDFParams params) {
+    const float3 h = SafeNormalize(params.lightDir + params.viewDir);
+    float specular  = normalize(dot(params.normal, h));
+    const float steps = max(params.roughness * 2, 0.01);
+    specular = round(specular * steps) / steps;
+    const float3 baseLitColor = specular * params.baseSpecular + params.baseDiffuse;
     return params.lightColor * params.attenuation * baseLitColor;
 }
 

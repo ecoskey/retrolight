@@ -25,32 +25,33 @@ static const int bayer8[8 * 8] = {
     63, 31, 55, 23, 61, 29, 53, 21
 };
 
-float Dither2(float value, float spread, uint2 pos) {
-    uint2 matrixPos = pos % 2;
-    uint matrixIndex = matrixPos.y * 2 + matrixPos.x;
-    const int matrixValue = bayer2[matrixIndex];
-    const float normMatrixValue = matrixValue / 4.0f - 0.5f;
-    return value + normMatrixValue * spread;
-}
+#define DITHER_TEMPLATE(Type, Dim, Dim2F) \
+    Type Dither##Dim(Type value, Type spread, uint2 pos) { \
+        uint2 matrixPos = pos % Dim; \
+        uint matrixIndex = matrixPos.y * Dim + matrixPos.x; \
+        const int matrixValue = bayer##Dim[matrixIndex]; \
+        const real normMatrixValue = matrixValue / Dim2F - 0.5f; \
+        return value + normMatrixValue * spread; \
+    }
 
-float Dither4(float value, float spread, uint2 pos) {
-    uint2 matrixPos = pos % 4;
-    uint matrixIndex = matrixPos.y * 4 + matrixPos.x;
-    const int matrixValue = bayer4[matrixIndex];
-    const float normMatrixValue = matrixValue / 16.0f - 0.5f;
-    return value + normMatrixValue * spread;
-}
+#define DITHER_TEMPLATE_ALL(Type) \
+    DITHER_TEMPLATE(Type, 2, 4.0f) \
+    DITHER_TEMPLATE(Type, 4, 16.0f) \
+    DITHER_TEMPLATE(Type, 8, 64.0f)
 
-float Dither8(float value, float spread, uint2 pos) {
-    uint2 matrixPos = pos % 8;
-    uint matrixIndex = matrixPos.y * 8 + matrixPos.x;
-    const int matrixValue = bayer8[matrixIndex];
-    const float normMatrixValue = matrixValue / 64.0f - 0.5f;
-    return value + normMatrixValue * spread;
-}
+#define QUANTIZE_TEMPLATE(Type) \
+    Type Quantize(Type value, int steps) { \
+        return floor(value * (steps - 1) + 0.5) / (steps - 1); \
+    }
 
-float Quantize(float value, int steps) {
-    return floor(value * (steps - 1) + 0.5) / (steps - 1);
-}
+DITHER_TEMPLATE_ALL(real)
+DITHER_TEMPLATE_ALL(real2)
+DITHER_TEMPLATE_ALL(real3)
+DITHER_TEMPLATE_ALL(real4)
+
+QUANTIZE_TEMPLATE(real)
+QUANTIZE_TEMPLATE(real2)
+QUANTIZE_TEMPLATE(real3)
+QUANTIZE_TEMPLATE(real4)
 
 #endif

@@ -1,20 +1,13 @@
-using System;
 using Retrolight.Data;
 using Retrolight.Util;
-using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
-using UnityEngine.Rendering;
 
 namespace Retrolight.Runtime.Passes {
     public class LightingPass : RenderPass<LightingPass.LightingPassData> {
-
-        private static readonly int finalColorTexId = Shader.PropertyToID("FinalColorTex");
-
         private readonly int lightingKernelId, lightCullingKernelId;
 
         public class LightingPassData {
-            public int lightCount;
             public LightingData LightingData;
         }
 
@@ -29,10 +22,8 @@ namespace Retrolight.Runtime.Passes {
             using var builder = CreatePass(out var passData);
             gBuffer.ReadAll(builder);
             lightInfo.ReadAll(builder);
-
-            passData.lightCount = lightInfo.LightCount;
-
-            var finalColorDesc = TextureUtility.ColorTex("FinalColorTex");
+            
+            var finalColorDesc = TextureUtility.ColorTex(Constants.FinalColorTexName);
             finalColorDesc.enableRandomWrite = true;
             
             var cullingResultsDesc = new ComputeBufferDesc(
@@ -40,7 +31,7 @@ namespace Retrolight.Runtime.Passes {
                     viewportParams.TileCount.x * viewportParams.TileCount.y,
                 sizeof(uint)
             ) {
-                name = "Culling Results",
+                name = Constants.CullingResultsBufferName,
                 type = ComputeBufferType.Raw,
             };
 
@@ -74,7 +65,7 @@ namespace Retrolight.Runtime.Passes {
 
             context.cmd.SetComputeTextureParam(
                 shaderBundle.LightingShader, lightingKernelId, 
-                finalColorTexId, passData.LightingData.FinalColorTex
+                Constants.FinalColorTexId, passData.LightingData.FinalColorTex
             );
             context.cmd.DispatchCompute(
                 shaderBundle.LightingShader, lightingKernelId,

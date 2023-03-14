@@ -10,7 +10,7 @@
 #define BUCKET_SIZE 32
 #define TILE_BUCKET_COUNT (MAX_LIGHTS / BUCKET_SIZE)
 
-uint LightCount;
+uint LightCount = MAX_LIGHTS; //todo: actually set from CPU
 StructuredBuffer<Light> Lights;
 ByteAddressBuffer CullingResults;
 

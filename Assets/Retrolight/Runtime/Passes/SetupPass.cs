@@ -7,9 +7,10 @@ using UnityEngine.Rendering;
 
 namespace Retrolight.Runtime.Passes {
     public class SetupPass : RenderPass<SetupPass.SetupPassData> {
-        private static readonly int viewportParamsId = Shader.PropertyToID("ViewportParams");
+        
         
         private readonly ConstantBuffer<ViewportParams> viewportParamsBuffer;
+        private bool viewportBufferAllocated = false;
         
         public class SetupPassData {
             public NativeArray<VisibleLight> Lights;
@@ -31,7 +32,7 @@ namespace Retrolight.Runtime.Passes {
             int lightCount = Math.Min(passData.Lights.Length, Constants.MaximumLights);
             
             var lightsDesc = new ComputeBufferDesc(Constants.MaximumLights, PackedLight.Stride) {
-                name = "Lights",
+                name = Constants.LightBufferName,
                 type = ComputeBufferType.Structured
             };
             var lightInfo = new LightInfo(lightCount, CreateWriteComputeBuffer(builder, lightsDesc));
@@ -41,7 +42,12 @@ namespace Retrolight.Runtime.Passes {
         }
 
         protected override void Render(SetupPassData passData, RenderGraphContext context) {
-            viewportParamsBuffer.PushGlobal(context.cmd, viewportParams, viewportParamsId);
+            if (!viewportBufferAllocated) {
+                viewportBufferAllocated = true;
+                viewportParamsBuffer.SetGlobal(context.cmd, Constants.ViewportParamsId);
+            }
+            viewportParamsBuffer.UpdateData(context.cmd, viewportParams);
+            
             var lightCount = passData.LightInfo.LightCount;
             NativeArray<PackedLight> packedLights = new NativeArray<PackedLight>(
                 lightCount, Allocator.Temp,
@@ -54,7 +60,10 @@ namespace Retrolight.Runtime.Passes {
             context.cmd.SetBufferData(passData.LightInfo.LightsBuffer, packedLights, 0, 0, lightCount);
             packedLights.Dispose();
             
-            context.cmd.SetGlobalInteger(Constants.LightCountId, lightCount);
+            //todo: BAD BAD BAD THIS IS AWFUL
+            //sets a float-backed value on the GPU, NOT AN INTEGER
+            //so, lightCount is many many many lights right now
+            context.cmd.SetGlobalInt(Constants.LightCountId, lightCount);
             context.cmd.SetGlobalBuffer(Constants.LightBufferId, passData.LightInfo.LightsBuffer);
         }
 

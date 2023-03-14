@@ -5,19 +5,6 @@ using UnityEngine.Rendering.RendererUtils;
 
 namespace Retrolight.Runtime.Passes {
     public class GBufferPass : RenderPass<GBufferPass.GBufferPassData> {
-        private static readonly ShaderTagId gBufferPassId = new ShaderTagId("RetrolightGBuffer");
-
-        private const string
-            albedoTexName = "AlbedoTex",
-            depthTexName = "DepthTex",
-            normalTexName = "NormalTex",
-            attributesTexName = "AttributesTex";
-
-        private static readonly int
-            albedoTexId = Shader.PropertyToID(albedoTexName),
-            depthTexId = Shader.PropertyToID(depthTexName),
-            normalTexId = Shader.PropertyToID(normalTexName),
-            attributesTexId = Shader.PropertyToID(attributesTexName);
 
         public class GBufferPassData {
             public GBuffer GBuffer;
@@ -32,14 +19,14 @@ namespace Retrolight.Runtime.Passes {
             using var builder = CreatePass(out var passData);
 
             GBuffer gBuffer = new GBuffer(
-                CreateUseColorBuffer(builder, 0, albedoTexName),
-                CreateUseDepthBuffer(builder, DepthAccess.Write, depthTexName),
-                CreateUseColorBuffer(builder, 1, normalTexName),
-                CreateUseColorBuffer(builder, 2, attributesTexName)
+                CreateUseColorBuffer(builder, 0, Constants.AlbedoTexName),
+                CreateUseDepthBuffer(builder, DepthAccess.Write, Constants.DepthTexName),
+                CreateUseColorBuffer(builder, 1, Constants.NormalTexName),
+                CreateUseColorBuffer(builder, 2, Constants.AttributesTexName)
             );
             passData.GBuffer = gBuffer;
 
-            RendererListDesc gBufferRendererDesc = new RendererListDesc(gBufferPassId, cull, camera) {
+            RendererListDesc gBufferRendererDesc = new RendererListDesc(Constants.GBufferPassId, cull, camera) {
                 sortingCriteria = SortingCriteria.CommonOpaque,
                 renderQueueRange = RenderQueueRange.opaque
             };
@@ -53,10 +40,10 @@ namespace Retrolight.Runtime.Passes {
             CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.GBufferRendererList);
 
             var gBuffer = passData.GBuffer;
-            context.cmd.SetGlobalTexture(albedoTexId, gBuffer.Albedo);
-            context.cmd.SetGlobalTexture(depthTexId, gBuffer.Depth);
-            context.cmd.SetGlobalTexture(normalTexId, gBuffer.Normal);
-            context.cmd.SetGlobalTexture(attributesTexId, gBuffer.Attributes);
+            context.cmd.SetGlobalTexture(Constants.AlbedoTexId, gBuffer.Albedo);
+            context.cmd.SetGlobalTexture(Constants.DepthTexId, gBuffer.Depth);
+            context.cmd.SetGlobalTexture(Constants.NormalTexId, gBuffer.Normal);
+            context.cmd.SetGlobalTexture(Constants.AttributesTexId, gBuffer.Attributes);
         }
     }
 }

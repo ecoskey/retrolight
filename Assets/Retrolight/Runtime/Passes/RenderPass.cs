@@ -14,6 +14,8 @@ namespace Retrolight.Runtime.Passes {
         protected Camera camera => pipeline.FrameData.Camera;
         protected CullingResults cull => pipeline.FrameData.Cull;
         protected ViewportParams viewportParams => pipeline.FrameData.ViewportParams;
+        protected bool usePostFx => pipeline.UsePostFx;
+        protected PostFxSettings postFxSettings => pipeline.PostFxSettings;
 
         protected RenderPass(Retrolight pipeline) {
             this.pipeline = pipeline;

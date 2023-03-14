@@ -4,8 +4,6 @@ using UnityEngine.Rendering.RendererUtils;
 
 namespace Retrolight.Runtime.Passes {
     public class DecalPass : RenderPass<DecalPass.DecalPassData> {
-        private static readonly ShaderTagId decalPassId = new ShaderTagId("RetrolightDecal");
-
         public class DecalPassData {
             public RendererListHandle DecalRendererList;
         }
@@ -23,14 +21,12 @@ namespace Retrolight.Runtime.Passes {
             builder.UseColorBuffer(gBuffer.Normal, 1);
             builder.UseColorBuffer(gBuffer.Attributes, 2);
 
-            RendererListDesc transparentRendererDesc = new RendererListDesc(decalPassId, cull, camera) {
-                sortingCriteria = SortingCriteria.CommonTransparent,
-                renderQueueRange = RenderQueueRange.transparent
+            var decalRendererDesc = new RendererListDesc(Constants.DecalPassId, cull, camera) {
+                sortingCriteria = SortingCriteria.CommonOpaque,
+                renderQueueRange = RenderQueueRange.opaque
             };
-            passData.DecalRendererList = renderGraph.CreateRendererList(transparentRendererDesc);
-
-            builder.AllowRendererListCulling(true);
-            builder.SetRenderFunc<DecalPassData>(Render);
+            var decalRendererHandle = renderGraph.CreateRendererList(decalRendererDesc);
+            passData.DecalRendererList = builder.UseRendererList(decalRendererHandle);
         }
 
         protected override void Render(DecalPassData passData, RenderGraphContext context) {

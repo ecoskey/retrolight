@@ -1,3 +1,4 @@
+using Retrolight.Data;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
@@ -14,11 +15,12 @@ namespace Retrolight.Runtime.Passes {
 
         protected override string PassName => "Transparent Pass";
 
-        public void Run(GBuffer gBuffer, TextureHandle colorTarget) {
+        public void Run(GBuffer gBuffer, LightInfo lightInfo, LightingData lightingData) {
             using var builder = CreatePass(out var passData);
 
             gBuffer.ReadAll(builder);
-            builder.UseColorBuffer(colorTarget, 0);
+            lightInfo.ReadAll(builder);
+            lightingData.ReadAll(builder);
 
             RendererListDesc transparentRendererDesc = new RendererListDesc(transparentPass, cull, camera) {
                 sortingCriteria = SortingCriteria.CommonTransparent,
