@@ -1,0 +1,6 @@
+{
+    "name": "Cosc.Retrolight.Shaders",
+    "references": [
+        "Cosc.Retrolight.Shaderlibrary"
+    ]
+}

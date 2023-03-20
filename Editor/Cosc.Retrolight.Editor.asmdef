@@ -1,0 +1,7 @@
+{
+    "name": "Cosc.Retrolight.Editor",
+    "references": [
+        "Cosc.Retrolight.Runtime",
+        "Unity.RenderPipelines.Core.Editor"
+    ]
+}

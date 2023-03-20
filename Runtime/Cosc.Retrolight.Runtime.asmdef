@@ -1,0 +1,6 @@
+{
+    "name": "Cosc.Retrolight.Runtime",
+    "references": [
+        "Unity.RenderPipelines.Core.Runtime"
+    ]
+}

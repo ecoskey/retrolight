@@ -1,0 +1,18 @@
+{
+    "name": "net.cosc.retrolight",
+    "displayName": "Retrolight",
+    "description": "A stylized render pipeline for Unity",
+    
+    "author": {
+        "name" : "Emerson Coskey",
+        "email" : "56370779+emersoncoskey@users.noreply.github.com",
+        "url" : "https://github.com/emersoncoskey"
+    },
+
+    "version": "0.1.0",
+    "unity": "2021.3",
+
+    "dependencies": {
+        "com.unity.render-pipelines.core": "12.1.7"
+    }
+}
