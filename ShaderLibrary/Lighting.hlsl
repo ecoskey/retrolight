@@ -66,7 +66,7 @@ BRDFParams GetBRDFParams(
     params.lightColor = light.Color();
     
     params.viewDir = ORTHOGRAPHIC_CAMERA ?
-        UNITY_MATRIX_I_V[2] :
+        UNITY_MATRIX_I_V[2].xyz :
         normalize(-GetCameraRelativePositionWS(positionInputs.positionWS));
 
     const float edgeStrength =

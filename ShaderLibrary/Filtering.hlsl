@@ -1,6 +1,8 @@
 #ifndef RETROLIGHT_DITHERING_INCLUDED
 #define RETROLIGHT_DITHERING_INCLUDED
 
+#include "Common.hlsl"
+
 //bayer matrix values copied from Acerola on YT
 static const int bayer2[2 * 2] = {
     0, 2,
@@ -53,5 +55,44 @@ QUANTIZE_TEMPLATE(real)
 QUANTIZE_TEMPLATE(real2)
 QUANTIZE_TEMPLATE(real3)
 QUANTIZE_TEMPLATE(real4)
+
+#define SEPARABLE_BLUR_X_TEMPLATE(Name, Size, Offsets, Weights) \
+    real4 Name##Size##_X(TEXTURE2D_PARAM(tex, sampler), float2 uv, float texelSize) { \
+        real4 color = 0.0; \
+        UNITY_UNROLLX(Size) \
+        for (int i = 0; i < Size; i++) { \
+        	float offset = Offsets[i] * 2.0 * texelSize; \
+        	color += SAMPLE_TEXTURE2D_LOD(tex, sampler, uv + float2(0.0, offset), 0) * Weights[i]; \
+        } \
+        return color; \
+    }
+
+#define SEPARABLE_BLUR_Y_TEMPLATE(Name, Size, Offsets, Weights) \
+    real4 Name##Size##_Y(TEXTURE2D_PARAM(tex, sampler), float2 uv, float texelSize) { \
+        real4 color = 0.0; \
+        UNITY_UNROLLX(Size) \
+        for (int i = 0; i < Size; i++) { \
+            float offset = Offsets[i] * 2.0 * texelSize; \
+            color += SAMPLE_TEXTURE2D_LOD(tex, sampler, uv + float2(0.0, offset), 0) * Weights[i]; \
+        } \
+        return color; \
+    }
+
+#define SEPARABLE_BLUR_TEMPLATE(Name, Size, Offsets, Weights) \
+    SEPARABLE_BLUR_X_TEMPLATE(Name, Size, Offsets, Weights) \
+    SEPARABLE_BLUR_Y_TEMPLATE(Name, Size, Offsets, Weights)
+
+static const float gaussianOffsets9[] = {
+    -3.23076923, -1.38461538, 0.0, 1.38461538, 3.23076923
+};
+static const float gaussianWeights9[] = {
+    0.07027027, 0.31621622, 0.22702703, 0.31621622, 0.07027027
+};
+
+//NOTE: SAMPLER MUST USE BILINEAR FILTERING
+SEPARABLE_BLUR_TEMPLATE(GaussianBlur9, 5, gaussianOffsets9, gaussianWeights9) 
+
+
+
 
 #endif

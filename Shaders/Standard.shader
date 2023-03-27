@@ -1,4 +1,4 @@
-Shader "Retrolight/StandardOpaque" {
+Shader "Retrolight/Standard" {
 	Properties {
 		[MainColor] _MainColor ("Color", Color) = (0.5, 0.5, 0.5, 1.0)
 		[MainTexture] _MainTex ("Texture", 2D) = "white" {}
@@ -17,8 +17,9 @@ Shader "Retrolight/StandardOpaque" {
 	}
 	SubShader {
 		Tags { 
-			"RenderType" = "Opaque" 
 			"RenderPipeline" = "Retrolight"
+			"RenderType" = "Opaque" 
+			"Queue" = "Geometry" 
 		}
 
 		Pass {

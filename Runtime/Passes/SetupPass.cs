@@ -1,14 +1,12 @@
 using System;
-using Retrolight.Data;
+using Data;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
-namespace Retrolight.Runtime.Passes {
+namespace Passes {
     public class SetupPass : RenderPass<SetupPass.SetupPassData> {
-        
-        
         private readonly ConstantBuffer<ViewportParams> viewportParamsBuffer;
         private bool viewportBufferAllocated = false;
         

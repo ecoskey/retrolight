@@ -1,9 +1,9 @@
-using Retrolight.Data;
-using Retrolight.Util;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
+using Data;
+using Util;
 
-namespace Retrolight.Runtime.Passes {
+namespace Passes {
     public class LightingPass : RenderPass<LightingPass.LightingPassData> {
         private readonly int lightingKernelId, lightCullingKernelId;
 

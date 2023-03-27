@@ -1,8 +1,9 @@
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
+using Data;
 
-namespace Retrolight.Runtime.Passes {
+namespace Passes {
     public class DecalPass : RenderPass<DecalPass.DecalPassData> {
         public class DecalPassData {
             public RendererListHandle DecalRendererList;

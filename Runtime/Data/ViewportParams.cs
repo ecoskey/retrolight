@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Retrolight.Data {
+namespace Data {
     [StructLayout(LayoutKind.Sequential)]
     public struct ViewportParams {
         private const float tileSize = 8f;

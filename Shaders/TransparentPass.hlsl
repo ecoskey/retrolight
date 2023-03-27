@@ -67,7 +67,6 @@ float4 TransparentFragment(const V2F input) : SV_Target
 
     float3 normal = NormalTangentToWorld(GetNormalTS(input.uv), input.normalWS, input.tangentWS);
     float3 normNorm = normalize(normal);
-
     return color;
 }
 

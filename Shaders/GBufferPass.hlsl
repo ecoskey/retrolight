@@ -4,9 +4,7 @@
 #include "../ShaderLibrary/Common.hlsl"
 
 TEXTURE2D(_MainTex);
-SAMPLER(sampler_point_clamp);
-
-#define sampler_MainTex sampler_point_clamp
+SAMPLER(sampler_MainTex);
 
 TEXTURE2D(_NormalMap);
 

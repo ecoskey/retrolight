@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Retrolight.Data {
+namespace Data {
     public readonly struct FrameData {
         public readonly Camera Camera;
         public readonly CullingResults Cull;

@@ -1,6 +1,6 @@
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
-namespace Retrolight.Data {
+namespace Data {
     public struct LightingData {
         public readonly TextureHandle FinalColorTex;
         public readonly ComputeBufferHandle CullingResultsBuffer;

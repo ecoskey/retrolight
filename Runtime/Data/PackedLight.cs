@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Retrolight.Data {
+namespace Data {
     [StructLayout(LayoutKind.Sequential)]
     public struct PackedLight {
         private Vector3 position;

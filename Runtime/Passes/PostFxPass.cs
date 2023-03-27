@@ -1,9 +1,9 @@
-using Retrolight.Data;
+using Data;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
-namespace Retrolight.Runtime.Passes {
+namespace Passes {
     public class PostFxPass : RenderPass<PostFxPass.PostProcessingPassData> {
         private readonly Material postProcessingMaterial;
 

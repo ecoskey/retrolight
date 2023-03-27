@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Retrolight.Data {
+namespace Data {
     [CreateAssetMenu(menuName = "Rendering/Custom Post FX Settings")]
     public class PostFxSettings : ScriptableObject {
         [Serializable]

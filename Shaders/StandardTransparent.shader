@@ -15,9 +15,14 @@ Shader "Retrolight/StandardTransparent" {
 	}
 	SubShader {
 		Tags { 
-			"RenderType" = "Transparent"
 			"RenderPipeline" = "Retrolight"
+			"RenderType" = "Transparent"
+			"Queue" = "Transparent"
 		}
+		
+		ZWrite Off
+		BlendOp Add
+		Blend One One
 
 		Pass {
 			Name "TransparentPass"

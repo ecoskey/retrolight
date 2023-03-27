@@ -11,7 +11,6 @@ Shader "Hidden/RetrolightBlit" {
 		Blend SrcAlpha OneMinusSrcAlpha
 		
 		Pass {
-			
 			HLSLPROGRAM
 			#pragma vertex FullscreenVertex
 			#pragma fragment BlitFragment

@@ -1,6 +1,6 @@
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
-namespace Retrolight.Runtime {
+namespace Data {
     public readonly struct GBuffer {
         public readonly TextureHandle Albedo;
         public readonly TextureHandle Depth;

@@ -1,11 +1,11 @@
-using Retrolight.Data;
-using Retrolight.Util;
+using Data;
+using Util;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
-namespace Retrolight.Runtime.Passes {
+namespace Passes {
     public abstract class RenderPass<T> where T : class, new() {
         private readonly Retrolight pipeline;
 

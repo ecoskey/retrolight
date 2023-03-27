@@ -1,8 +1,8 @@
 using System;
-using Retrolight.Data;
+using Data;
 using UnityEngine;
 
-namespace Retrolight.Util {
+namespace Util {
     public static class SnappingUtility {
         public readonly struct SnappingContext : IDisposable {
             private readonly Transform transform;

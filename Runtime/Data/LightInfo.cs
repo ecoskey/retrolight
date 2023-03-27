@@ -1,6 +1,6 @@
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
-namespace Retrolight.Data {
+namespace Data {
     public struct LightInfo {
         public readonly int LightCount;
         public readonly ComputeBufferHandle LightsBuffer;

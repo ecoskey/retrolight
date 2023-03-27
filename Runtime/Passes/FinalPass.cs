@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
-namespace Retrolight.Runtime.Passes {
+namespace Passes {
     public class FinalPass : RenderPass<FinalPass.FinalPassData> {
         public class FinalPassData {
             public TextureHandle FinalColorTex;

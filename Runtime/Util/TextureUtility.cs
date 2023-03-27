@@ -3,7 +3,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
-namespace Retrolight.Util {
+namespace Util {
     public static class TextureUtility {
         public static bool IsSrgb => QualitySettings.activeColorSpace == ColorSpace.Gamma;
 

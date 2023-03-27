@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Retrolight.Data {
+namespace Data {
     [CreateAssetMenu(fileName = "Shader Bundle", menuName = "Shader Bundle", order = 0)]
     public class ShaderBundle : ScriptableObject {
         [SerializeField] private ComputeShader lightCullingShader;
