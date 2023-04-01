@@ -2,7 +2,7 @@ using Data;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[CreateAssetMenu(fileName = "Retrolight Settings", menuName = "Retrolight/Pipeline", order = 0)]
+[CreateAssetMenu(fileName = "Retrolight Settings", menuName = "Retrolight/Retrolight Settings", order = 0)]
 public class RetrolightAsset : RenderPipelineAsset {
     [SerializeField, Range(1, 8)] private int pixelRatio = 4;
     [SerializeField] private bool usePostFx;

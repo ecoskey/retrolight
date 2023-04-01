@@ -16,3 +16,7 @@ MonoBehaviour:
   lightingShader: {fileID: 7200000, guid: 46146151f79441d79b24c0d69438b288, type: 3}
   blitShader: {fileID: 4800000, guid: 1f3a2c4a65254c7e87fce0ea2d2dde48, type: 3}
   blitWithDepthShader: {fileID: 4800000, guid: 1fdb84711ca540ce8230532fa1ccb19e, type: 3}
+  blurShader: {fileID: 4800000, guid: eaafb821d6bb4122bb9ec7bfeff5b3a1, type: 3}
+  bloomCombineShader: {fileID: 4800000, guid: 09dce63dc8854b88ade96478ef322379, type: 3}
+  colorCorrectionShader: {fileID: 4800000, guid: bf9160d4dfc641f79b986d642076bb42,
+    type: 3}

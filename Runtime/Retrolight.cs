@@ -27,13 +27,11 @@ public sealed class Retrolight : RenderPipeline {
     private TransparentPass transparentPass;
     private PostFxPass postFxPass;
     private FinalPass finalPass;
-        
 
     public Retrolight(
         ShaderBundle shaderBundle, int pixelRatio,
         bool usePostFx, PostFxSettings postFxSettings
     ) {
-        //todo: enable SRP batcher, other graphics settings like linear light intensity
         GraphicsSettings.lightsUseLinearIntensity = true;
         GraphicsSettings.useScriptableRenderPipelineBatching = true;
             
@@ -54,7 +52,6 @@ public sealed class Retrolight : RenderPipeline {
 
         Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
         RTHandles.Initialize(Screen.width / PixelRatio, Screen.height / PixelRatio);
-        //RTHandles.ResetReferenceSize(Screen.width / PixelRatio, Screen.height / PixelRatio);
     }
 
     protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
@@ -98,7 +95,18 @@ public sealed class Retrolight : RenderPipeline {
             var gBuffer = gBufferPass.Run();
             var lightingData = lightingPass.Run(gBuffer, lightInfo);
             transparentPass.Run(gBuffer, lightInfo, lightingData);
+            
+            #if UNITY_EDITOR
+            if (
+                camera.cameraType != CameraType.SceneView ||
+                SceneView.currentDrawingSceneView.sceneViewState.showImageEffects
+            ) {
+                postFxPass.Run(lightingData.FinalColorTex, PostFxSettings);
+            }
+            #else
             postFxPass.Run(lightingData.FinalColorTex, PostFxSettings);
+            #endif
+
             //for post processing: don't run if scene view, and if scene view disables image fx
             //PostProcessPass -> writes to final color buffer after all other shaders
             finalPass.Run(lightingData.FinalColorTex, snapContext.ViewportShift);
@@ -120,9 +128,8 @@ public sealed class Retrolight : RenderPipeline {
             
         #if UNITY_EDITOR //todo: is this the right way to do this?
         if (
-            SceneView.currentDrawingSceneView is not null &&
-            SceneView.currentDrawingSceneView.camera is not null && 
-            SceneView.currentDrawingSceneView.camera == camera
+            camera.cameraType == CameraType.SceneView &&
+            !SceneView.currentDrawingSceneView.sceneViewState.showImageEffects
         ) {
             context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
             context.DrawGizmos(camera, GizmoSubset.PostImageEffects);

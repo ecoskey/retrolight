@@ -25,6 +25,10 @@ struct Sphere {
     float r;
 };
 
+struct Cone {
+    
+};
+
 struct Capsule {
     float3 a;
     float3 b;
@@ -53,6 +57,8 @@ float2 UVToScreenSpaceXY(float2 uv) {
 void TransformSphereToView(inout Sphere volume) {
     volume.pos = TransformWorldToView(volume.pos);
 }
+
+
 
 AABB OrthoVolumeFromUVDepth(float2 minUv, float2 maxUv, float minDepth, float maxDepth) {
     AABB volume;

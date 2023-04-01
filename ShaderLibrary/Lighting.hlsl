@@ -73,7 +73,7 @@ BRDFParams GetBRDFParams(
         edges.x > 0.0 ?
             1.0 - surface.depthEdgeStrength  * edges.x:
             1.0 + surface.normalEdgeStrength * edges.y;
-
+    
     float3 relativeLightPos;
     switch (light.Type()) {
         case DIRECTIONAL_LIGHT:

@@ -9,7 +9,7 @@ TEXTURE2D(NormalTex);
 TEXTURE2D(AttributesTex);
 
 float4 SampleAlbedo(float2 uv) {
-    return SAMPLE_TEXTURE2D_LOD(AlbedoTex, DEFAULT_SAMPLER, uv, 0);
+    return SAMPLE_TEXTURE2D_LOD(AlbedoTex, POINT_SAMPLER, uv, 0);
 }
 
 float4 LoadAlbedo(uint2 pos) {
@@ -29,7 +29,7 @@ float OrthoEyeDepth(float depth) {
 }
 
 float Sample01Depth(float2 uv) {
-    const float rawDepth = SAMPLE_DEPTH_TEXTURE(DepthTex, DEFAULT_SAMPLER, uv);
+    const float rawDepth = SAMPLE_DEPTH_TEXTURE(DepthTex, POINT_SAMPLER, uv);
     if (ORTHOGRAPHIC_CAMERA) return Ortho01Depth(rawDepth);
     return Linear01Depth(rawDepth, _ZBufferParams);
 }
@@ -41,7 +41,7 @@ float Load01Depth(uint2 pos) {
 }
 
 float SampleEyeDepth(float2 uv) {
-    const float rawDepth = SAMPLE_DEPTH_TEXTURE(DepthTex, DEFAULT_SAMPLER, uv);
+    const float rawDepth = SAMPLE_DEPTH_TEXTURE(DepthTex, POINT_SAMPLER, uv);
     if (ORTHOGRAPHIC_CAMERA) return OrthoEyeDepth(rawDepth);
     return LinearEyeDepth(rawDepth, _ZBufferParams);
 }
@@ -53,7 +53,7 @@ float LoadEyeDepth(uint2 pos) {
 }
 
 float3 SampleNormal(float2 uv) {
-    return normalize(SAMPLE_TEXTURE2D_LOD(NormalTex, DEFAULT_SAMPLER, uv, 0).rgb * 2 - 1);
+    return normalize(SAMPLE_TEXTURE2D_LOD(NormalTex, POINT_SAMPLER, uv, 0).rgb * 2 - 1);
 }
 
 float3 LoadNormal(uint2 pos) {
@@ -61,7 +61,7 @@ float3 LoadNormal(uint2 pos) {
 }
 
 float4 SampleAttributes(float2 uv) {
-    return SAMPLE_TEXTURE2D_LOD(AttributesTex, DEFAULT_SAMPLER, uv, 0);
+    return SAMPLE_TEXTURE2D_LOD(AttributesTex, POINT_SAMPLER, uv, 0);
 }
 
 float4 LoadAttributes(uint2 pos) {

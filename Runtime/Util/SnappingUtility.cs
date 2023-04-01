@@ -1,6 +1,7 @@
 using System;
 using Data;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Util {
     public static class SnappingUtility {

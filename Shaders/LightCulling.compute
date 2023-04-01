@@ -51,12 +51,12 @@ void LightCulling(ThreadInfo input)
     if (IsPixelOOB(input.dispatchId)) return;
     /*const float depth = LoadEyeDepth(input.dispatchId);
     #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
-        const float _minDepth = WaveActiveMin(depth);
-        const float _maxDepth = WaveActiveMax(depth);
-        if (WaveIsFirstLane()) {
-            InterlockedMin(uMinDepth, asuint(_minDepth));
-            InterlockedMax(uMaxDepth, asuint(_maxDepth));
-        }
+    const float _minDepth = WaveActiveMin(depth);
+    const float _maxDepth = WaveActiveMax(depth);
+    if (WaveIsFirstLane()) {
+        InterlockedMin(uMinDepth, asuint(_minDepth));
+        InterlockedMax(uMaxDepth, asuint(_maxDepth));
+    }
     #else
     InterlockedMin(uMinDepth, asuint(depth));
     InterlockedMax(uMaxDepth, asuint(depth));
@@ -74,11 +74,12 @@ void LightCulling(ThreadInfo input)
     const float depthRangeRecip = float(BUCKET_SIZE) / (fMaxDepth - fMinDepth);
     const uint depthMaskIndex = clamp(floor((depth - fMinDepth) * depthRangeRecip), 0, BUCKET_SIZE - 1);
     uint partialDepthMask = 1 << depthMaskIndex;
+    
     #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
-        partialDepthMask = WaveActiveBitOr(partialDepthMask);
-        if (WaveIsFirstLane()) {
-            InterlockedOr(depthMask, partialDepthMask);
-        }
+    partialDepthMask = WaveActiveBitOr(partialDepthMask);
+    if (WaveIsFirstLane()) {
+        InterlockedOr(depthMask, partialDepthMask);
+    }
     #else
     InterlockedOr(depthMask, partialDepthMask);
     #endif
@@ -116,8 +117,8 @@ void LightCulling(ThreadInfo input)
             uint lightDepthMask = PointLightMask(volume, fMinDepth, depthRangeRecip);
             if (lightDepthMask & depthMask) AllowLight(i);
             break;
-        case SPOT_LIGHT: break;
-        case LINE_LIGHT: break;
+        case SPOT_LIGHT:
+        //case LINE_LIGHT:
         default: break;
         }
     }
