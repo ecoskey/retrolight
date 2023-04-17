@@ -23,11 +23,11 @@ namespace Passes {
             gBuffer.ReadAll(builder);
             lightInfo.ReadAll(builder);
             
-            var finalColorDesc = TextureUtility.ColorTex(Constants.FinalColorTexName);
+            var finalColorDesc = TextureUtil.ColorTex(Constants.FinalColorTexName);
             finalColorDesc.enableRandomWrite = true;
             
             var cullingResultsDesc = new ComputeBufferDesc(
-                Mathf.CeilToInt(Constants.MaximumLights / 32f) * 
+                MathUtil.NextMultipleOf(Constants.MaximumLights, sizeof(uint)) * 
                     viewportParams.TileCount.x * viewportParams.TileCount.y,
                 sizeof(uint)
             ) {
@@ -44,30 +44,29 @@ namespace Passes {
             return lightingData;
         }
         
-        protected override void Render(LightingPassData passData, RenderGraphContext context) {
+        protected override void Render(LightingPassData passData, RenderGraphContext ctx) {
             var tileCount = viewportParams.TileCount;
+            ctx.cmd.SetGlobalBuffer(Constants.CullingResultsId, passData.LightingData.CullingResultsBuffer);
 
-            context.cmd.SetGlobalBuffer(Constants.CullingResultsId, passData.LightingData.CullingResultsBuffer);
-
-            context.cmd.DispatchCompute(
+            ctx.cmd.DispatchCompute(
                 shaderBundle.LightCullingShader, lightCullingKernelId, 
                 tileCount.x, tileCount.y, 1
             );
             
-            context.cmd.SetComputeMatrixParam(shaderBundle.LightingShader, "unity_MatrixV", camera.worldToCameraMatrix);
-            context.cmd.SetComputeMatrixParam(
+            ctx.cmd.SetComputeMatrixParam(shaderBundle.LightingShader, "unity_MatrixV", camera.worldToCameraMatrix);
+            ctx.cmd.SetComputeMatrixParam(
                 shaderBundle.LightingShader, "unity_MatrixInvVP", 
                 (GL.GetGPUProjectionMatrix(camera.projectionMatrix, true) * camera.worldToCameraMatrix).inverse
             );
-            context.cmd.SetComputeVectorParam(
+            ctx.cmd.SetComputeVectorParam(
                 shaderBundle.LightingShader, "_WorldSpaceCameraPos", camera.transform.position
             );
 
-            context.cmd.SetComputeTextureParam(
+            ctx.cmd.SetComputeTextureParam(
                 shaderBundle.LightingShader, lightingKernelId, 
                 Constants.FinalColorTexId, passData.LightingData.FinalColorTex
             );
-            context.cmd.DispatchCompute(
+            ctx.cmd.DispatchCompute(
                 shaderBundle.LightingShader, lightingKernelId,
                 tileCount.x, tileCount.y, 1
             );

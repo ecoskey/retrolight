@@ -11,6 +11,7 @@ Shader "Hidden/Retrolight/BloomCombine" {
 		
 		HLSLINCLUDE
 		#include "../ShaderLibrary/Common.hlsl"
+		#include "../ShaderLibrary/Filtering.hlsl"
 		#include "../ShaderLibrary/Fullscreen.hlsl"
 		#pragma vertex FullscreenVertex
 		#pragma fragment BloomCombineFragment
@@ -24,10 +25,9 @@ Shader "Hidden/Retrolight/BloomCombine" {
 
 			HLSLPROGRAM
 			float4 BloomCombineFragment(V2F input) : SV_Target {
-				float3 lowRes = SAMPLE_TEXTURE2D_LOD(_Source1, BILINEAR_SAMPLER, input.uv, 0).rgb;
+				float3 lowRes = Tent9(_Source1, BILINEAR_SAMPLER, input.uv, 0, float2(.01, .01)).rgb;
 				float3 highRes = SAMPLE_TEXTURE2D_LOD(_Source2, BILINEAR_SAMPLER, input.uv, 0).rgb;
 				return float4(lowRes + highRes, 1);
-				LOAD_TEXTURE2D_LOD()
 			}
 			ENDHLSL
 		}

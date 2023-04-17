@@ -23,9 +23,9 @@ namespace Passes {
             passData.ViewportShift = viewportShift;
         }
 
-        protected override void Render(FinalPassData passData, RenderGraphContext context) {
+        protected override void Render(FinalPassData passData, RenderGraphContext ctx) {
             Blitter.BlitCameraTexture(
-                context.cmd, passData.FinalColorTex, passData.CameraTarget,
+                ctx.cmd, passData.FinalColorTex, passData.CameraTarget,
                 new Vector4(1, 1, passData.ViewportShift.x, passData.ViewportShift.y), 0, false
             );
         }

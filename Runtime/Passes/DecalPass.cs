@@ -30,8 +30,8 @@ namespace Passes {
             passData.DecalRendererList = builder.UseRendererList(decalRendererHandle);
         }
 
-        protected override void Render(DecalPassData passData, RenderGraphContext context) {
-            context.cmd.DrawRendererList(passData.DecalRendererList);
+        protected override void Render(DecalPassData passData, RenderGraphContext ctx) {
+            ctx.cmd.DrawRendererList(passData.DecalRendererList);
         }
     }
 }

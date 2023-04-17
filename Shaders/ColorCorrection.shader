@@ -1,3 +1,0 @@
-Shader "Hidden/Retrolight/ColorCorrection" {
-	
-}

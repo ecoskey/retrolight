@@ -36,9 +36,9 @@ namespace Passes {
             passData.TransparentRendererList = builder.UseRendererList(transparentRenderer);
         }
 
-        protected override void Render(TransparentPassData passData, RenderGraphContext context) {
-            CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.TransparentRendererList);
-            //CoreUtils.DrawFullScreen(context.cmd, testMaterial);
+        protected override void Render(TransparentPassData passData, RenderGraphContext ctx) {
+            CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, passData.TransparentRendererList);
+            //CoreUtils.DrawFullScreen(ctx.cmd, testMaterial);
         }
     }
 }

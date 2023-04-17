@@ -101,7 +101,7 @@ BRDFParams GetBRDFParams(
             params.attenuation *= SpotAttenuation(params.lightDir, light.Direction(), light.CosAngle());
         
             params.attenuation = Quantize(Dither8(params.attenuation, 0.1, positionInputs.positionSS), 4);
-            params.attenuation *= edgeStrength;
+            //params.attenuation *= edgeStrength;
             break;
         default:
             params.lightDir = float3(0, 1, 0);

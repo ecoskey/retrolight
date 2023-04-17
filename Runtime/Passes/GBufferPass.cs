@@ -1,7 +1,9 @@
 using Data;
+using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.RendererUtils;
+using RendererListDesc = UnityEngine.Rendering.RendererUtils.RendererListDesc;
 
 namespace Passes {
     public class GBufferPass : RenderPass<GBufferPass.GBufferPassData> {
@@ -36,14 +38,14 @@ namespace Passes {
             return gBuffer;
         }
 
-        protected override void Render(GBufferPassData passData, RenderGraphContext context) {
-            CoreUtils.DrawRendererList(context.renderContext, context.cmd, passData.GBufferRendererList);
+        protected override void Render(GBufferPassData passData, RenderGraphContext ctx) {
+            CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, passData.GBufferRendererList);
 
             var gBuffer = passData.GBuffer;
-            context.cmd.SetGlobalTexture(Constants.AlbedoTexId, gBuffer.Albedo);
-            context.cmd.SetGlobalTexture(Constants.DepthTexId, gBuffer.Depth);
-            context.cmd.SetGlobalTexture(Constants.NormalTexId, gBuffer.Normal);
-            context.cmd.SetGlobalTexture(Constants.AttributesTexId, gBuffer.Attributes);
+            ctx.cmd.SetGlobalTexture(Constants.AlbedoTexId, gBuffer.Albedo);
+            ctx.cmd.SetGlobalTexture(Constants.DepthTexId, gBuffer.Depth);
+            ctx.cmd.SetGlobalTexture(Constants.NormalTexId, gBuffer.Normal);
+            ctx.cmd.SetGlobalTexture(Constants.AttributesTexId, gBuffer.Attributes);
         }
     }
 }

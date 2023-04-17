@@ -1,39 +1,40 @@
-#pragma kernel Bloom
+#pragma kernel DownsampleFirst
+#pragma kernel Downsample
+#pragma kernel Upsample
 
 #include "../ShaderLibrary/Filtering.hlsl"
 #include "../ShaderLibrary/Viewport.hlsl"
 
-TEXTURE2D(Source);
-RW_TEXTURE2D(float4, BloomTarget);
-uint2 BloomTargetSize;
-
-bool BicubicUpscale;
-
-#define MIP_LEVELS 3
 #define TILE_SIZE 8
 
+TEXTURE2D(Source);
+float4 SourceParams; //xy is rthandle scale, zw is 1/scaled resolution
+
+RW_TEXTURE2D(float4, Target);
+float4 TargetRes;
+
+float4 ThresholdParams;
+float Intensity;
+
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
-void Bloom(uint2 id : SV_DispatchThreadID) {
-    if (!any(id >= BloomTargetSize))
-    
-    
-    //get uv coordinate for current thread based on pixel coords
-    UNITY_UNROLLX(MIP_LEVELS)
-    for (uint i = 0; i < MIP_LEVELS; i++) {
-        if (any(id >= BloomTargetSize >> i)) break;
-        gaussianBlur9_Compute_X(BloomTargetSize, id, i)
-        //blur on x coordinate and write back to texture
-        //AllMemoryBarrierWithGroupSync();
-        //blur on y coordinate and write back to texture
-        //AllMemoryBarrierWithGroupSync();
-    }
+void DownsampleFirst(const uint2 pos : SV_DispatchThreadID) {
+    if (IsPixelOOB(pos, TargetRes.xy)) return;
+    const float2 uv = PixelToUV(pos, TargetRes.zw) * SourceParams.xy;
+    const float4 color = CustomBox13(TEXTURE2D_ARGS(Source, BILINEAR_SAMPLER), uv, 0, SourceParams.zw);
+    Target[pos] = BloomThreshold(color, ThresholdParams);
+}
 
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
+void Downsample(const uint2 pos : SV_DispatchThreadID) {
+    if (IsPixelOOB(pos, TargetRes.xy)) return;
+    const float2 uv = PixelToUV(pos, TargetRes.zw) * SourceParams.xy;
+    Target[pos] = CustomBox13(TEXTURE2D_ARGS(Source, BILINEAR_SAMPLER), uv, 0, SourceParams.zw);
+}
 
-    UNITY_UNROLLX(MIP_LEVELS)
-    for (int i = MIP_LEVELS - 2; i >= 0; --i) {
-        //sample from mip level i + 1
-        //mipLevel[i] += sampled value
-    }
-
-    //combine mip level 0 and bloom source
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
+void Upsample(const uint2 pos : SV_DispatchThreadID) {
+    if (IsPixelOOB(pos, TargetRes.xy)) return;
+    const float2 uv = PixelToUV(pos, TargetRes.zw) * SourceParams.xy;
+    const float4 upsampled = Tent9(TEXTURE2D_ARGS(Source, BILINEAR_SAMPLER), uv, 0, SourceParams.zw);
+    Target[pos] += upsampled * Intensity;
 }

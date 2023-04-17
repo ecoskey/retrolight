@@ -59,7 +59,6 @@ void TransformSphereToView(inout Sphere volume) {
 }
 
 
-
 AABB OrthoVolumeFromUVDepth(float2 minUv, float2 maxUv, float minDepth, float maxDepth) {
     AABB volume;
     volume.min = float3(UVToScreenSpaceXY(minUv), minDepth);

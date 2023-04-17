@@ -6,9 +6,11 @@ using Util;
 
 namespace Passes {
     public class PostFxPass : RenderPass<PostFxPass.PostProcessingPassData> {
-        private readonly BlurUtility blurUtility;
-        private readonly Material bloomCombineMaterial;
-        private readonly Material colorCorrectionMaterial;
+        private readonly ComputeShader bloomShader;
+        private readonly ComputeShader colorCorrectionShader;
+
+        private int downsampleFirstK, downsampleK, upsampleK;
+        private int colorCorrectionK;
             
         public class PostProcessingPassData {
             public TextureHandle FinalColorTex;
@@ -16,18 +18,24 @@ namespace Passes {
 
             public int BloomIterations;
             public TextureHandle[] BloomPyramid;
-            public TextureHandle[] BloomPyramidTemp;
         }
 
         private static readonly int
-            bloomSource1Id = Shader.PropertyToID("_Source1"),
-            bloomSource2Id = Shader.PropertyToID("_Source2");
-        
-        
+            sourceId = Shader.PropertyToID("Source"),
+            targetId = Shader.PropertyToID("Target"),
+            thresholdParamsId = Shader.PropertyToID("ThresholdParams"),
+            intensityId = Shader.PropertyToID("Intensity"),
+            sourceParamsId = Shader.PropertyToID("SourceParams"),
+            targetSizeId = Shader.PropertyToID("TargetRes");
+
         public PostFxPass(Retrolight pipeline) : base(pipeline) {
-            blurUtility = new BlurUtility(BlurUtility.BlurType.Box3);
-            bloomCombineMaterial = CoreUtils.CreateEngineMaterial(shaderBundle.BloomCombineShader);
-            colorCorrectionMaterial = CoreUtils.CreateEngineMaterial(shaderBundle.ColorCorrectionShader);
+            bloomShader = shaderBundle.BloomShader;
+            colorCorrectionShader = shaderBundle.ColorCorrectionShader;
+
+            downsampleFirstK = bloomShader.FindKernel("DownsampleFirst");
+            downsampleK = bloomShader.FindKernel("Downsample");
+            upsampleK = bloomShader.FindKernel("Upsample");
+            colorCorrectionK = colorCorrectionShader.FindKernel("ColorCorrection");
         }
 
 
@@ -36,60 +44,76 @@ namespace Passes {
         public void Run(TextureHandle finalColorTex, PostFxSettings settings) {
             using var builder = CreatePass(out var passData);
             passData.FinalColorTex = builder.ReadWriteTexture(finalColorTex);
-            passData.PostFxSettings = settings;
+            passData.PostFxSettings = postFxSettings;
             
-            RunBloom(builder, passData);
+            if (settings.BloomSettings.EnableBloom) RunBloom(builder, passData, settings.BloomSettings);
         }
 
         private void RunBloom(
             RenderGraphBuilder builder, 
-            PostProcessingPassData passData
+            PostProcessingPassData passData,
+            BloomSettings bloomSettings
         ) {
-            var bloom = passData.PostFxSettings.Bloom;
-            var bloomTexDesc = TextureUtility.ColorTex(new Vector2(0.5f, 0.5f));
-
-            var bloomIterations = 3;
-            
-            passData.BloomPyramid = new TextureHandle[bloomIterations]; //todo: reset these
-            passData.BloomPyramidTemp = new TextureHandle[bloomIterations];
-            int i = 0; //todo: this is for later checking against minimum resolution
-            for (; i < bloomIterations/*bloom.MaxIterations*/; i++) {
+            var bloomTexDesc = TextureUtil.ColorTex(new Vector2(0.5f, 0.5f));
+            passData.BloomPyramid = new TextureHandle[bloomSettings.MaxIterations];
+            int i = 0; 
+            for (; i < bloomSettings.MaxIterations; i++) {
+                //check if current size goes below safe resolution, if so, break out of loop
+                Vector2 scaledSize = RTHandles.rtHandleProperties.currentViewportSize;
+                scaledSize.Scale(bloomTexDesc.scale);
+                if (scaledSize.x <= bloomSettings.DownscaleLimit || scaledSize.y <= bloomSettings.DownscaleLimit) break;
+                
                 bloomTexDesc.name = "BloomTex" + i;
+                bloomTexDesc.enableRandomWrite = true;
                 passData.BloomPyramid[i] = builder.CreateTransientTexture(bloomTexDesc);
-                bloomTexDesc.name = "BloomTempTex" + i;
-                passData.BloomPyramidTemp[i] = builder.CreateTransientTexture(bloomTexDesc);
                 bloomTexDesc.scale /= 2;
             }
             passData.BloomIterations = i; 
         }
 
-        protected override void Render(PostProcessingPassData passData, RenderGraphContext context) {
-            RenderBloom(passData, context);
+        protected override void Render(PostProcessingPassData passData, RenderGraphContext ctx) {
+            if (passData.BloomIterations > 0) RenderBloom(passData, ctx);
         }
 
 
-        private void RenderBloom(PostProcessingPassData passData, RenderGraphContext context) {
-            TextureHandle source = passData.FinalColorTex;
-            for (int i = 0; i < passData.BloomIterations; i++) {
-                blurUtility.Blur(context.cmd, source, passData.BloomPyramid[i], passData.BloomPyramidTemp[i]);
-                source = passData.BloomPyramid[i];
-            }
+        private void RenderBloom(PostProcessingPassData passData, RenderGraphContext ctx) {
+            if (passData.BloomIterations <= 0) return;
             
-            var bloomCombineProps = new MaterialPropertyBlock();
-            for (int i = passData.BloomIterations - 2; i >= 0; i--) {
-                bloomCombineProps.SetTexture(bloomSource1Id, passData.BloomPyramid[i + 1]);
-                bloomCombineProps.SetTexture(bloomSource2Id, passData.BloomPyramid[i]);
-                CoreUtils.DrawFullScreen(
-                    context.cmd, bloomCombineMaterial, 
-                    passData.BloomPyramidTemp[i], bloomCombineProps
-                );
-            }
-            Blitter.BlitCameraTexture(context.cmd, passData.BloomPyramidTemp[0], passData.FinalColorTex, 0, true);
+            var bloom = passData.PostFxSettings.BloomSettings;
+            BloomPass(bloom, ctx.cmd, passData.FinalColorTex, passData.BloomPyramid[0], downsampleFirstK);
+            for (int i = 1; i < passData.BloomIterations; i++) 
+                BloomPass(bloom, ctx.cmd, passData.BloomPyramid[i - 1], passData.BloomPyramid[i], downsampleK);
+            for (int i = passData.BloomIterations - 1; i > 0; i--) 
+                BloomPass(bloom, ctx.cmd, passData.BloomPyramid[i], passData.BloomPyramid[i - 1], upsampleK);
+            BloomPass(bloom, ctx.cmd, passData.BloomPyramid[0], passData.FinalColorTex, upsampleK);
         }
 
-        public override void Dispose() {
-            CoreUtils.Destroy(bloomCombineMaterial);
-            CoreUtils.Destroy(colorCorrectionMaterial);
+        private void BloomPass(BloomSettings bloomSettings, CommandBuffer cmd, RTHandle source, RTHandle target, int kernel) {
+            Vector4 sourceParams;
+            Vector2 rtHandleScale = RTHandles.rtHandleProperties.rtHandleScale;
+            Vector2 scaleFactor = source.scaleFactor;
+            sourceParams.x = /*rtHandleScale.x * */scaleFactor.x;
+            sourceParams.y = /*rtHandleScale.y * */scaleFactor.y;
+            Vector2Int scaledSize = source.GetScaledSize();
+            sourceParams.z = 1f / scaledSize.x;
+            sourceParams.w = 1f / scaledSize.y;
+
+            Vector2Int targetSize = target.GetScaledSize();
+
+            cmd.SetComputeVectorParam(bloomShader, thresholdParamsId, bloomSettings.ThresholdParams);
+            cmd.SetComputeFloatParam(bloomShader, intensityId, bloomSettings.Intensity);
+            cmd.SetComputeVectorParam(bloomShader, sourceParamsId, sourceParams);
+            cmd.SetComputeVectorParam(
+                bloomShader, targetSizeId, 
+                new Vector4(targetSize.x, targetSize.y, 1f / targetSize.x, 1f / targetSize.y)
+            );
+            cmd.SetComputeTextureParam(bloomShader, kernel, sourceId, source);
+            cmd.SetComputeTextureParam(bloomShader, kernel, targetId, target);
+            cmd.DispatchCompute(
+                bloomShader, kernel, 
+                MathUtil.NextMultipleOf(targetSize.x, Constants.SmallTile), 
+                MathUtil.NextMultipleOf(targetSize.y, Constants.SmallTile), 1
+            );
         }
     }
 }

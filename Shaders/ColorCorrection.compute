@@ -1,0 +1,55 @@
+#pragma kernel ColorCorrection
+
+#include "../ShaderLibrary/Common.hlsl"
+#include "../ShaderLibrary/Viewport.hlsl"
+#include "../ShaderLibrary/Color.hlsl"
+
+#define TILE_SIZE 8
+
+RW_TEXTURE2D(float4, ColorTex);
+uint2 ColorTexSize;
+
+CBUFFER_START(ColorGradingSettings)
+float exposure;
+float3 whiteBalanceCoeffs;
+float contrast;
+float3 colorFilter;
+float hueShift;
+float saturation;
+SplitToningSettings splitToning;
+ChannelMixerSettings channelMixer;
+SmhSettings shadowsMidtonesHighlights;
+CBUFFER_END
+
+#pragma multi_compile TM_NONE TM_REINHARD TM_NEUTRAL TM_ACES
+
+#if TM_REINHARD
+    #define TONEMAP TonemapReinhard
+#elif TM_NEUTRAL
+    #define TONEMAP TonemapNeutral
+#elif TM_ACES
+    #define TONEMAP TonemapACES
+#else
+    #define TONEMAP TonemapReinhard
+#endif
+
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
+void ColorCorrection(const uint2 pos : SV_DispatchThreadId) {
+    if (IsPixelOOB(pos, ColorTexSize)) return;
+    float4 _color = LOAD_TEXTURE2D(ColorTex, pos);
+    float3 color = _color.rgb;
+    color = min(color, 60);
+    color = PostExposure(color, exposure);
+    color = WhiteBalance(color, whiteBalanceCoeffs);
+    color = Contrast(color, contrast);
+    color = ColorFilter(color, colorFilter);
+    color = SplitToning(color, splitToning);
+    color = ChannelMixer(color, channelMixer);
+    color = ShadowsMidtonesHighlights(color, shadowsMidtonesHighlights);
+    color = HueShift(color, hueShift);
+    color = Saturation(color, saturation);
+    color = TONEMAP(color);
+    ColorTex[pos] = float4(color, _color.a);
+    
+    ///float4 color = LOAD_TEXTURE2D()
+}

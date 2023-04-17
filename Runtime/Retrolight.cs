@@ -50,22 +50,22 @@ public sealed class Retrolight : RenderPipeline {
         postFxPass = new PostFxPass(this);
         finalPass = new FinalPass(this);
 
+        RTHandles.Initialize(1, 1);
         Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
-        RTHandles.Initialize(Screen.width / PixelRatio, Screen.height / PixelRatio);
     }
 
-    protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
-        BeginFrameRendering(context, cameras);
+    protected override void Render(ScriptableRenderContext ctx, Camera[] cameras) {
+        BeginFrameRendering(ctx, cameras);
         foreach (var camera in cameras) {
-            BeginCameraRendering(context, camera);
-            RenderCamera(context, camera);
-            EndCameraRendering(context, camera);
+            BeginCameraRendering(ctx, camera);
+            RenderCamera(ctx, camera);
+            EndCameraRendering(ctx, camera);
         }
         RenderGraph.EndFrame();
-        EndFrameRendering(context, cameras);
+        EndFrameRendering(ctx, cameras);
     }
 
-    private void RenderCamera(ScriptableRenderContext context, Camera camera) {
+    private void RenderCamera(ScriptableRenderContext ctx, Camera camera) {
         if (!camera.TryGetCullingParameters(out var cullingParams)) return;
         //TODO: SET THIS FROM CONFIG PLEASE PLEASE PLEASE PLEASE PLEASE
         //TODO: SET THIS FROM CONFIG PLEASE PLEASE PLEASE PLEASE PLEASE
@@ -74,18 +74,18 @@ public sealed class Retrolight : RenderPipeline {
         cullingParams.shadowDistance = camera.farClipPlane; //at least for orthographic mode
         //cullingParams.shadowDistance = Mathf.Min(maxShadowDistance, camera.farClipPlane);
         //cullingParams.shadowDistance = 100; //TODO: SET THIS FROM CONFIG PLEASE PLEASE PLEASE PLEASE PLEASE
-        CullingResults cull = context.Cull(ref cullingParams);
+        CullingResults cull = ctx.Cull(ref cullingParams);
         RTHandles.SetReferenceSize(camera.pixelWidth / PixelRatio, camera.pixelHeight / PixelRatio);
         var viewportParams = new ViewportParams(RTHandles.rtHandleProperties);
         FrameData = new FrameData(camera, cull, viewportParams);
 
-        using var snapContext = SnappingUtility.Snap(camera, camera.transform, viewportParams); //todo: move to FrameData
+        using var snapContext = SnappingUtil.SnapCamera(camera, viewportParams); //todo: move to FrameData
 
-        context.SetupCameraProperties(camera);
+        ctx.SetupCameraProperties(camera);
 
         CommandBuffer cmd = CommandBufferPool.Get("Execute Retrolight Render Graph");
         var renderGraphParams = new RenderGraphParameters {
-            scriptableRenderContext = context,
+            scriptableRenderContext = ctx,
             commandBuffer = cmd,
             currentFrameIndex = Time.frameCount,
         };
@@ -106,16 +106,14 @@ public sealed class Retrolight : RenderPipeline {
             #else
             postFxPass.Run(lightingData.FinalColorTex, PostFxSettings);
             #endif
-
-            //for post processing: don't run if scene view, and if scene view disables image fx
-            //PostProcessPass -> writes to final color buffer after all other shaders
+            
             finalPass.Run(lightingData.FinalColorTex, snapContext.ViewportShift);
         }
         
 
         switch (camera.clearFlags) {
             case CameraClearFlags.Skybox:  
-                context.DrawSkybox(camera);
+                ctx.DrawSkybox(camera);
                 break;
             case CameraClearFlags.Color:   break;
             case CameraClearFlags.Depth:   break;
@@ -123,7 +121,7 @@ public sealed class Retrolight : RenderPipeline {
             default: throw new ArgumentOutOfRangeException();
         }
             
-        context.ExecuteCommandBuffer(cmd);
+        ctx.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);
             
         #if UNITY_EDITOR //todo: is this the right way to do this?
@@ -131,11 +129,11 @@ public sealed class Retrolight : RenderPipeline {
             camera.cameraType == CameraType.SceneView &&
             !SceneView.currentDrawingSceneView.sceneViewState.showImageEffects
         ) {
-            context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
-            context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
+            ctx.DrawGizmos(camera, GizmoSubset.PreImageEffects);
+            ctx.DrawGizmos(camera, GizmoSubset.PostImageEffects);
         }
         #endif
-        context.Submit();
+        ctx.Submit();
     }
 
     protected override void Dispose(bool disposing) {
@@ -154,8 +152,7 @@ public sealed class Retrolight : RenderPipeline {
         postFxPass = null;
         transparentPass = null;
         finalPass = null;
-
-        Blitter.Cleanup();
+        
         //RenderGraph.UnRegisterDebug();
         RenderGraph.Cleanup();
         RenderGraph = null;

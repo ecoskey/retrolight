@@ -18,23 +18,20 @@ groupshared uint uMinDepth = 0xFFFFFFFF;
 groupshared uint uMaxDepth = 0;
 groupshared uint depthMask = 0;
 
-struct ThreadInfo
-{
+struct ThreadInfo {
     uint2 id : SV_GroupID;
     uint index : SV_GroupIndex;
     uint2 dispatchId : SV_DispatchThreadID;
     uint2 subId : SV_GroupThreadID;
 };
 
-void AllowLight(uint index)
-{
+void AllowLight(uint index) {
     uint bucketIndex = index / BUCKET_SIZE;
     uint bitIndex = index % BUCKET_SIZE;
     InterlockedOr(tile[bucketIndex], 1 << bitIndex);
 }
 
-uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip)
-{
+uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip) {
     const float minDepth = screenVolume.pos.z - screenVolume.r;
     const float maxDepth = screenVolume.pos.z + screenVolume.r;
     const uint minIndex = clamp(0, BUCKET_SIZE - 1, floor((minDepth - fMinDepth) * depthRangeRecip));
@@ -46,9 +43,8 @@ uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip)
 }
 
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
-void LightCulling(ThreadInfo input)
-{
-    if (IsPixelOOB(input.dispatchId)) return;
+void LightCulling(const ThreadInfo input) {
+    //if (IsPixelOOB(input.dispatchId)) return;
     /*const float depth = LoadEyeDepth(input.dispatchId);
     #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
     const float _minDepth = WaveActiveMin(depth);
@@ -61,7 +57,8 @@ void LightCulling(ThreadInfo input)
     InterlockedMin(uMinDepth, asuint(depth));
     InterlockedMax(uMaxDepth, asuint(depth));
     #endif
-    GroupMemoryBarrierWithGroupSync();
+    
+   // GroupMemoryBarrierWithGroupSync();
 
     #if UNITY_REVERSED_Z
     const float fMinDepth = asfloat(uMaxDepth);
@@ -84,7 +81,7 @@ void LightCulling(ThreadInfo input)
     InterlockedOr(depthMask, partialDepthMask);
     #endif
 
-    uint i;
+    uint i; //reuse loop variable
 
     UNITY_UNROLL
     for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE)
@@ -94,32 +91,28 @@ void LightCulling(ThreadInfo input)
 
     GroupMemoryBarrierWithGroupSync();
 
-    //todo: possible inaccuracy sampling at center of pixel, not corner
-    //const float2 minUv = PixelToUV(input.id * TILE_SIZE * TILE_SIZE);
-    //const float2 maxUv = PixelToUV((input.id + 1) * TILE_SIZE * TILE_SIZE);
-    float2 minUv = 0;
-    float2 maxUv = 1;
+    const float2 minUv = PixelToUV(input.id * TILE_SIZE);
+    const float2 maxUv = PixelToUV((input.id + 1) * TILE_SIZE);
     const AABB tileVolume = OrthoVolumeFromUVDepth(minUv, maxUv, fMinDepth, fMaxDepth);
 
     UNITY_LOOP
     for (i = input.index; i < MAX_LIGHTS; i += TILE_SIZE * TILE_SIZE)
     {
         Light light = Lights[i];
-        switch (light.Type())
-        {
-        case DIRECTIONAL_LIGHT:
-            AllowLight(i);
-            break;
-        case POINT_LIGHT:
-            Sphere volume = PointLightCullVolume(light);
-            TransformSphereToView(volume);
-            if (!SphereIntersectsAABB(volume, tileVolume)) break; //todo: test culling against camera frustum/aabb
-            uint lightDepthMask = PointLightMask(volume, fMinDepth, depthRangeRecip);
-            if (lightDepthMask & depthMask) AllowLight(i);
-            break;
-        case SPOT_LIGHT:
-        //case LINE_LIGHT:
-        default: break;
+        switch (light.Type()) {
+            case DIRECTIONAL_LIGHT:
+                AllowLight(i);
+                break;
+            case POINT_LIGHT:
+                Sphere volume = PointLightCullVolume(light);
+                TransformSphereToView(volume);
+                if (!SphereIntersectsAABB(volume, tileVolume)) break; //todo: test culling against camera frustum/aabb
+                uint lightDepthMask = PointLightMask(volume, fMinDepth, depthRangeRecip);
+                if (lightDepthMask & depthMask) AllowLight(i);
+                break;
+            case SPOT_LIGHT:
+            //case LINE_LIGHT:
+            default: break;
         }
     }
 
@@ -140,7 +133,7 @@ void LightCulling(ThreadInfo input)
     }
 
     UNITY_LOOP
-    for (i = input.index; i < LightCount; i += TILE_SIZE * TILE_SIZE) {
+    for (i = input.index; i < MAX_LIGHTS; i += TILE_SIZE * TILE_SIZE) {
         AllowLight(i);
     }
 

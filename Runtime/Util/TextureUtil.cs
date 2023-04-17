@@ -4,7 +4,7 @@ using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
 namespace Util {
-    public static class TextureUtility {
+    public static class TextureUtil {
         public static bool IsSrgb => QualitySettings.activeColorSpace == ColorSpace.Gamma;
 
         public const string

@@ -7,6 +7,10 @@ public static class Constants {
         MaxDirectionalShadows = 16,
         MaxOtherShadows = 64;
 
+    public const int
+        SmallTile = 8,
+        MediumTile = 16;
+
     public static readonly ShaderTagId 
         GBufferPassId = new ShaderTagId("RetrolightGBuffer"),
         DecalPassId = new ShaderTagId("RetrolightDecal"),

@@ -6,7 +6,6 @@ Shader "Retrolight/Standard" {
 		[Normal] [NoScaleOffset] _NormalMap ("Normal Map", 2D) = "bump" {}
 		_NormalScale("Normal Scale", Range(0, 1)) = 1
 		
-		
 		_Cutoff ("Alpha Cutoff", Range(0, 1)) = 0.0
 		
 		_Metallic ("Metallic", Range(0, 1)) = 0.0

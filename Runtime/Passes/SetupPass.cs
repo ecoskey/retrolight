@@ -39,12 +39,12 @@ namespace Passes {
             return lightInfo;
         }
 
-        protected override void Render(SetupPassData passData, RenderGraphContext context) {
+        protected override void Render(SetupPassData passData, RenderGraphContext ctx) {
             if (!viewportBufferAllocated) {
                 viewportBufferAllocated = true;
-                viewportParamsBuffer.SetGlobal(context.cmd, Constants.ViewportParamsId);
+                viewportParamsBuffer.SetGlobal(ctx.cmd, Constants.ViewportParamsId);
             }
-            viewportParamsBuffer.UpdateData(context.cmd, viewportParams);
+            viewportParamsBuffer.UpdateData(ctx.cmd, viewportParams);
             
             var lightCount = passData.LightInfo.LightCount;
             NativeArray<PackedLight> packedLights = new NativeArray<PackedLight>(
@@ -55,14 +55,14 @@ namespace Passes {
                 packedLights[i] = new PackedLight(passData.Lights[i], 0);
             }
             
-            context.cmd.SetBufferData(passData.LightInfo.LightsBuffer, packedLights, 0, 0, lightCount);
+            ctx.cmd.SetBufferData(passData.LightInfo.LightsBuffer, packedLights, 0, 0, lightCount);
             packedLights.Dispose();
             
             //todo: BAD BAD BAD THIS IS AWFUL
             //sets a float-backed value on the GPU, NOT AN INTEGER
             //so, lightCount is many many many lights right now
-            context.cmd.SetGlobalInt(Constants.LightCountId, lightCount);
-            context.cmd.SetGlobalBuffer(Constants.LightBufferId, passData.LightInfo.LightsBuffer);
+            //ctx.cmd.SetGlobalInteger(Constants.LightCountId, lightCount);
+            ctx.cmd.SetGlobalBuffer(Constants.LightBufferId, passData.LightInfo.LightsBuffer);
         }
 
         public override void Dispose() => viewportParamsBuffer.Release();

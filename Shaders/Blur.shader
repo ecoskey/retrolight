@@ -18,24 +18,24 @@ Shader "Hidden/Retrolight/Blur" {
 		
 		#pragma multi_compile GAUSSIAN_9 BOX_3 BOX_5 BOX_7
 		#if GAUSSIAN_9
-			#define BLUR_X gaussianBlur9_X
-			#define BLUR_Y gaussianBlur9_Y
+			#define BLUR_X gaussian9_X
+			#define BLUR_Y gaussian9_Y
 		#elif BOX_3
-			#define BLUR_X boxBlur3_X
-			#define BLUR_Y boxBlur3_Y
+			#define BLUR_X box3_X
+			#define BLUR_Y box3_Y
 		#elif BOX_5
-			#define BLUR_X boxBlur5_X
-			#define BLUR_Y boxBlur5_Y
+			#define BLUR_X box5_X
+			#define BLUR_Y box5_Y
 		#elif BOX_7
-			#define BLUR_X boxBlur7_X
-			#define BLUR_Y boxBlur7_Y
+			#define BLUR_X box7_X
+			#define BLUR_Y box7_Y
 		#else
-			#define BLUR_X boxBlur3_X
-			#define BLUR_Y boxBlur3_Y
+			#define BLUR_X box3_X
+			#define BLUR_Y box3_Y
 		#endif
 
 		TEXTURE2D(_BlurSource);
-		float _TexelSize;
+		float2 _TexelSize;
 		
 		ENDHLSL
 		
@@ -44,7 +44,7 @@ Shader "Hidden/Retrolight/Blur" {
 
 			HLSLPROGRAM
 			float4 BlurFragment(V2F input) : SV_Target {
-				return BLUR_X(TEXTURE2D_ARGS(_BlurSource, BILINEAR_SAMPLER), input.uv, 0, _TexelSize);
+				return CustomBox13(TEXTURE2D_ARGS(_BlurSource, BILINEAR_SAMPLER), input.uv, 0, _TexelSize);
 			}
 			ENDHLSL
 		}
@@ -54,7 +54,7 @@ Shader "Hidden/Retrolight/Blur" {
 
 			HLSLPROGRAM
 			float4 BlurFragment(V2F input) : SV_Target {
-				 return BLUR_Y(TEXTURE2D_ARGS(_BlurSource, BILINEAR_SAMPLER), input.uv, 0, _TexelSize);
+				 return CustomBox13(TEXTURE2D_ARGS(_BlurSource, BILINEAR_SAMPLER), input.uv, 0, _TexelSize);
 			}
 			ENDHLSL
 		}

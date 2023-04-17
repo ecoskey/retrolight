@@ -46,7 +46,7 @@ float GetNormalEdgeIndicator(int2 pos, float depth, float3 normal) {
     return step(0.1, indicator);
 }
 
-float2 GetEdgeStrength(int2 pos) {
+/*float2 GetEdgeStrength(int2 pos) {
     const float2 edgeStrengths = LoadAttributes(pos).zw;
     const float depthEdgeStrength = edgeStrengths.x;
     const float normalEdgeStrength = edgeStrengths.y;
@@ -70,7 +70,6 @@ float2 GetEdgeStrength(int2 pos) {
     }
     
     return float2(dei, nei);
-    //return edgeStrengths;
-}
+}*/
 
 #endif
