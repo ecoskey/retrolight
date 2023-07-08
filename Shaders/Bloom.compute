@@ -5,10 +5,9 @@
 #include "../ShaderLibrary/Filtering.hlsl"
 #include "../ShaderLibrary/Viewport.hlsl"
 
-#define TILE_SIZE 8
-
 TEXTURE2D(Source);
 float4 SourceParams; //xy is rthandle scale, zw is 1/scaled resolution
+//todo: figure out what about this is making the things dumb
 
 RW_TEXTURE2D(float4, Target);
 float4 TargetRes;

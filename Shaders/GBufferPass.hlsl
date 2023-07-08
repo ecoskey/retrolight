@@ -2,6 +2,7 @@
 #define RETROLIGHT_GBUFFER_PASS_INCLUDED
 
 #include "../ShaderLibrary/Common.hlsl"
+#include "../ShaderLibrary/Lighting.hlsl"
 
 TEXTURE2D(_MainTex);
 SAMPLER(sampler_MainTex);
@@ -15,8 +16,7 @@ UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
     UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
     UNITY_DEFINE_INSTANCED_PROP(float, _Metallic)
     UNITY_DEFINE_INSTANCED_PROP(float, _Smoothness)
-    UNITY_DEFINE_INSTANCED_PROP(float, _DepthEdgeStrength)
-    UNITY_DEFINE_INSTANCED_PROP(float, _NormalEdgeStrength)
+    UNITY_DEFINE_INSTANCED_PROP(float, _EdgeStrength)
 UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 struct VertexInput {
@@ -36,9 +36,9 @@ struct V2F {
 };
 
 struct GBufferOut {
-    float4 albedo : SV_Target0;
-    float4 normal : SV_Target1;
-    float4 attributes : SV_Target2;
+    float4 diffuse : SV_Target0;
+    float4 specular : SV_Target1;
+    float3 normal : SV_Target2;
 };
 
 float3 GetNormalTS(float2 baseUV)
@@ -65,25 +65,23 @@ V2F GBufferVertex(VertexInput input)
 GBufferOut GBufferFragment(V2F input)
 {
     UNITY_SETUP_INSTANCE_ID(input);
-    GBufferOut output;
-    float4 baseMap = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
-    float4 baseColor = ACCESS_PROP(_MainColor);
+    const float4 baseMap = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
+    const float4 baseColor = ACCESS_PROP(_MainColor);
     float4 color = baseMap * baseColor;
     clip(color.a - ACCESS_PROP(_Cutoff));
-    color.a = 1;
-    output.albedo = color;
 
-    float3 normal = NormalTangentToWorld(GetNormalTS(input.uv), input.normalWS, input.tangentWS);
-    float3 normNorm = normalize(normal);
-    output.normal = float4((normNorm + 1) / 2, 1);
+    const float3 normal = normalize(NormalTangentToWorld(GetNormalTS(input.uv), input.normalWS, input.tangentWS));
 
-    output.attributes = float4(
-        ACCESS_PROP(_Metallic),
-        ACCESS_PROP(_Smoothness),
-        ACCESS_PROP(_DepthEdgeStrength),
-        ACCESS_PROP(_NormalEdgeStrength)
+    Surface surface = GetMetallicSurface(
+        color.rgb, 1, normal, ACCESS_PROP(_Metallic),
+        ACCESS_PROP(_Smoothness), ACCESS_PROP(_EdgeStrength)
     );
 
+    GBufferOut output;
+    output.diffuse = float4(surface.baseDiffuse, surface.roughness);
+    output.specular = float4(surface.baseSpecular, surface.edgeStrength);
+    output.normal = surface.normal;
+    
     return output;
 }
 

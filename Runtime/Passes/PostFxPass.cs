@@ -92,8 +92,8 @@ namespace Passes {
             Vector4 sourceParams;
             Vector2 rtHandleScale = RTHandles.rtHandleProperties.rtHandleScale;
             Vector2 scaleFactor = source.scaleFactor;
-            sourceParams.x = /*rtHandleScale.x * */scaleFactor.x;
-            sourceParams.y = /*rtHandleScale.y * */scaleFactor.y;
+            sourceParams.x = rtHandleScale.x * scaleFactor.x;
+            sourceParams.y = rtHandleScale.y * scaleFactor.y;
             Vector2Int scaledSize = source.GetScaledSize();
             sourceParams.z = 1f / scaledSize.x;
             sourceParams.w = 1f / scaledSize.y;

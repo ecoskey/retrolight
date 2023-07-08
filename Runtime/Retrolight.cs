@@ -17,7 +17,7 @@ public sealed class Retrolight : RenderPipeline {
     internal readonly int PixelRatio;
     internal readonly bool UsePostFx;
     internal readonly PostFxSettings PostFxSettings;
-        
+
     internal FrameData FrameData { get; private set; }
 
     //render passes

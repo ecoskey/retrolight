@@ -2,9 +2,19 @@
 #define RETROLIGHT_DECAL_PASS_INCLUDED
 
 #include "../ShaderLibrary/GBuffer.hlsl"
+#include "../ShaderLibrary/Common.hlsl"
 
-TEXTURE2D(SourceTex);
-SAMPLER(sampler_SourceTex);
+TEXTURE2D(_MainTex);
+SAMPLER(sampler_MainTex);
+
+//TEXTURE2D(_NormalMap);
+
+UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
+    UNITY_DEFINE_INSTANCED_PROP(float4, _MainColor)
+    UNITY_DEFINE_INSTANCED_PROP(float4, _MainTex_ST)
+    //UNITY_DEFINE_INSTANCED_PROP(float, _NormalScale)
+    //UNITY_DEFINE_INSTANCED_PROP(float, _Cutoff)
+UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 struct VertexInput {
     float3 positionOS : POSITION;
@@ -17,10 +27,18 @@ struct V2F {
 };
 
 struct GBufferOut {
-    float4 albedo : SV_Target0;
-    float4 normal : SV_Target1;
-    float4 attributes : SV_Target2;
+    float4 diffuse : SV_Target0;
+    //float4 normal : SV_Target1;
+    //float4 attributes : SV_Target2;
 };
+
+/*float3 GetNormalTS(float2 baseUV)
+{
+    float4 map = SAMPLE_TEXTURE2D(_NormalMap, sampler_MainTex, baseUV);
+    float scale = ACCESS_PROP(_NormalScale);
+    float3 normal = DecodeNormal(map, scale);
+    return normal;
+}*/
 
 V2F DecalVertex(VertexInput input) {
     V2F output;
@@ -34,6 +52,26 @@ GBufferOut DecalFragment(V2F input) {
     GBufferOut output;
     UNITY_SETUP_INSTANCE_ID(input);
     const float2 screenUV = (input.positionCS.xy + 1) / 2;
-    const float3 positionWS = WorldSpaceFromDepth()
+    const float3 positionWS = WorldSpaceFromDepth(screenUV);
+    const float3 positionOS = TransformWorldToObject(positionWS);
+    const float2 uv = positionOS.xy;
+    
+    //clip(all(positionOS.xy >= 0 || positionOS.xy <= 1));
+
+    const float3 colorWS = SampleDiffuse(screenUV);
+    
+    const float4 baseMap = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
+    const float4 baseColor = ACCESS_PROP(_MainColor);
+    const float4 color = baseMap * baseColor;
+    output.diffuse = float4(1,1,1,1);
+    //output.albedo = color + float4(colorWS, 1 - color.a);
+    
+    /*float3 normalWS = SampleNormal(screenUV);
+
+    float3 normal = NormalTangentToWorld(GetNormalTS(uv), normalWS, input.tangentWS);
+    float3 normNorm = normalize(normal);
+    output.normal = float4((normNorm + 1) / 2, 1);*/
+    
+    return output;
 }
 #endif

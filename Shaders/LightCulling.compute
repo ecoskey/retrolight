@@ -2,18 +2,11 @@
 
 #include "../ShaderLibrary/Common.hlsl"
 #include "../ShaderLibrary/Viewport.hlsl"
-#include "../ShaderLibrary/Light.hlsl"
 #include "../ShaderLibrary/Culling.hlsl"
-#include "../ShaderLibrary/GBuffer.hlsl"
 
-#define BUCKET_SIZE 32
-#define TILE_BUCKET_COUNT (MAX_LIGHTS / BUCKET_SIZE)
+RWByteAddressBuffer LightCullingResults;
 
-uint LightCount;
-StructuredBuffer<Light> Lights;
-RWByteAddressBuffer CullingResults;
-
-groupshared uint tile[TILE_BUCKET_COUNT];
+groupshared uint tile[LIGHT_TILE_BUCKET_COUNT];
 groupshared uint uMinDepth = 0xFFFFFFFF;
 groupshared uint uMaxDepth = 0;
 groupshared uint depthMask = 0;
@@ -128,7 +121,7 @@ void LightCulling(const ThreadInfo input) {
     uint i;
 
     UNITY_UNROLL
-    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
+    for (i = input.index; i < LIGHT_TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
         tile[i] = 0;
     }
 
@@ -137,9 +130,9 @@ void LightCulling(const ThreadInfo input) {
         AllowLight(i);
     }
 
-    const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
+    const uint globalTileOffset = TileIndex(input.id) * LIGHT_TILE_BUCKET_COUNT;
     UNITY_UNROLL
-    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
-        CullingResults.Store(globalTileOffset + i, tile[i]);
+    for (i = input.index; i < LIGHT_TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
+        LightCullingResults.Store(globalTileOffset + i, tile[i]);
     }
 }

@@ -3,13 +3,14 @@
 
 #include "Common.hlsl"
 
-#define MAX_LIGHTS 1024
-
 #define DIRECTIONAL_LIGHT 0
 #define POINT_LIGHT 1
 #define SPOT_LIGHT 2
 
 #define F_LIGHT_SHADOWED 1
+
+#define MAX_LIGHTS 1024
+#define LIGHT_TILE_BUCKET_COUNT TILE_BUCKET_COUNT(MAX_LIGHTS)
 
 //todo: look into utilities in Core RP lib Packing.hlsl 
 struct Light {
@@ -82,5 +83,8 @@ struct Light {
         #endif
     }
 };
+
+uint LightCount; //todo: actually set from CPU
+StructuredBuffer<Light> Lights;
 
 #endif

@@ -1,7 +1,13 @@
 #ifndef RETROLIGHT_VIEWPORT_INCLUDED
 #define RETROLIGHT_VIEWPORT_INCLUDED
 
-#define TILE_SIZE 8 // tiles are 8x8
+#if TILING_SMALL
+    #define TILE_SIZE 8
+#elif TILING_MED
+    #define TILE_SIZE 16
+#else
+    #define TILE_SIZE 16
+#endif
 
 CBUFFER_START(ViewportParams)
 float4 Resolution;

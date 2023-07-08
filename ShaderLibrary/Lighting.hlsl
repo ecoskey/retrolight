@@ -4,30 +4,27 @@
 #include "Common.hlsl"
 #include "Light.hlsl"
 #include "Filtering.hlsl"
+#include "Culling.hlsl"
 #include "Shadows.hlsl"
 
+
+ByteAddressBuffer LightCullingResults;
+
+float3 GetViewDir(float3 positionWS) {
+    return ORTHOGRAPHIC_CAMERA ?
+        UNITY_MATRIX_I_V[2].xyz :
+        normalize(-GetCameraRelativePositionWS(positionWS));
+}
+
+// SURFACE
+
 struct Surface {
-    float3 color;
-    float alpha;
-    float3 normal;
-
-    float metallic;
-    float smoothness;
-    float depthEdgeStrength;
-    float normalEdgeStrength;
-};
-
-struct BRDFParams {
     float3 baseDiffuse;
+    float alpha;
     float3 baseSpecular;
     float3 normal;
     float roughness;
-
-    float3 lightColor;
-    float attenuation;
-
-    float3 viewDir;
-    float3 lightDir;
+    float edgeStrength;
 };
 
 #define MIN_REFLECTIVITY 0.04
@@ -37,9 +34,36 @@ float OneMinusReflectivity(const float metallic) {
     return range - metallic * range;
 }
 
+Surface GetMetallicSurface(
+    const float3 color, const float alpha, const float3 normal,
+    const float metallic, const float smoothness, const float edgeStrength, const bool applyAlphaToDiffuse = false
+) {
+    Surface surface;
+    const float oneMinusReflectivity = OneMinusReflectivity(metallic);
+    surface.baseDiffuse = color * oneMinusReflectivity;
+    if (applyAlphaToDiffuse) {
+        surface.baseDiffuse *= alpha;
+    }
+    surface.alpha = alpha;
+    surface.baseSpecular = lerp(MIN_REFLECTIVITY, color, metallic);
+    const float perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(smoothness);
+    surface.normal = normal;
+    surface.roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
+    surface.edgeStrength = edgeStrength;
+    return surface;
+}
+
+// LIGHTING
+
+struct LightingData {
+    float3 color;
+    float attenuation;
+    float3 lightDir;
+};
+
 float PointAttenuation(const float d2, const float r, const float f) {
     const float s2 = saturate(d2 * rcp(Sq(r)));
-    return Sq(1 - s2) * rcp(f * s2);
+    return Sq(1 - s2) * rcp(1 + f * s2);
 }
 
 float SpotAttenuation(const float3 dirToLight, const float3 lightDir, const float lightCosAngle) {
@@ -47,92 +71,68 @@ float SpotAttenuation(const float3 dirToLight, const float3 lightDir, const floa
     return saturate(1.0 - (1.0 - cosAngleToLight) * 1.0/(1.0 - lightCosAngle));
 }
 
-BRDFParams GetBRDFParams(
-    const Surface surface, const PositionInputs positionInputs,
-    Light light, const float2 edges, const bool applyAlphaToDiffuse = false
-) {
-    BRDFParams params;
-    //todo: separate non-light related stuff into separate function to run less times
-    const float oneMinusReflectivity = OneMinusReflectivity(surface.metallic);
-    params.baseDiffuse = surface.color * oneMinusReflectivity;
-    if (applyAlphaToDiffuse) {
-        params.baseDiffuse *= surface.alpha;
-    }
-    params.baseSpecular = lerp(MIN_REFLECTIVITY, surface.color, surface.metallic);
-    const float perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(surface.smoothness);
-    params.normal = surface.normal;
-    params.roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
+LightingData GetLighting(Light light, const float3 surfaceNormal, const PositionInputs positionInputs) {
+    LightingData lighting;
 
-    params.lightColor = light.Color();
-    
-    params.viewDir = ORTHOGRAPHIC_CAMERA ?
-        UNITY_MATRIX_I_V[2].xyz :
-        normalize(-GetCameraRelativePositionWS(positionInputs.positionWS));
-
-    const float edgeStrength =
-        edges.x > 0.0 ?
-            1.0 - surface.depthEdgeStrength  * edges.x:
-            1.0 + surface.normalEdgeStrength * edges.y;
-    
+    lighting.color = light.Color();
+    const uint2 noiseCoords = positionInputs.positionSS;
     float3 relativeLightPos;
+    
     switch (light.Type()) {
         case DIRECTIONAL_LIGHT:
-            params.lightDir = light.Direction();
-            params.attenuation = saturate(dot(params.normal, params.lightDir));
-            params.attenuation = Quantize(Dither8(params.attenuation, 0.05, positionInputs.positionSS), 8);
-            params.attenuation *= edgeStrength;
+            lighting.lightDir = light.Direction();
+            lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
+            lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.05, noiseCoords), 8);
             //if (light.Flags() & F_LIGHT_SHADOWED)
                 //params.attenuation *= GetDirectionalShadowAttenuation(positionInputs.positionWS, light.ShadowStrength());
             break;
         case POINT_LIGHT:
             relativeLightPos = light.position - positionInputs.positionWS;
-            params.lightDir = normalize(relativeLightPos);
-            params.attenuation = saturate(dot(params.normal, params.lightDir));
-            params.attenuation *= PointAttenuation(Length2(relativeLightPos), light.Range(), 1);
-        
-            params.attenuation = Quantize(Dither8(params.attenuation, 0.1, positionInputs.positionSS), 4);
-            params.attenuation *= edgeStrength;
+            lighting.lightDir = normalize(relativeLightPos);
+            lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
+            lighting.attenuation *= PointAttenuation(Length2(relativeLightPos), light.Range(), 1);
+            lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.1, noiseCoords), 6);
             break;
         case SPOT_LIGHT:
             relativeLightPos = light.position - positionInputs.positionWS;
-            params.lightDir = normalize(relativeLightPos);
-            params.attenuation = saturate(dot(params.normal, params.lightDir));
-            params.attenuation *= PointAttenuation(Length2(relativeLightPos), light.Range(), 1);
-            params.attenuation *= SpotAttenuation(params.lightDir, light.Direction(), light.CosAngle());
-        
-            params.attenuation = Quantize(Dither8(params.attenuation, 0.1, positionInputs.positionSS), 4);
-            //params.attenuation *= edgeStrength;
+            lighting.lightDir = normalize(relativeLightPos);
+            lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
+            //lighting.attenuation *= PointAttenuation(Length2(relativeLightPos), light.Range(), 1);
+            lighting.attenuation *= SpotAttenuation(lighting.lightDir, light.Direction(), light.CosAngle());
+            lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.1, noiseCoords), 6);
             break;
         default:
-            params.lightDir = float3(0, 1, 0);
-            params.attenuation = 0;
+            lighting.lightDir = float3(0, 1, 0);
+            lighting.attenuation = 0;
             break;
     }
 
-    return params;
+    return lighting;
 }
 
-float3 DirectBRDF(const BRDFParams params) {
+#define BRDF_PARAMS Surface surface, LightingData lighting, float3 viewDir
+
+float3 DirectBRDF(BRDF_PARAMS) {
     //return surface.normal;
     //return IncomingLight(surface, light);
-    const float3 h = SafeNormalize(params.lightDir + params.viewDir);
-    const float nh2 = Sq(saturate(dot(params.normal, h)));
-    const float lh2 = Sq(saturate(dot(params.lightDir, h)));
-    const float r2 = Sq(params.roughness);
+    const float3 h = SafeNormalize(lighting.lightDir + viewDir);
+    const float nh2 = Sq(saturate(dot(surface.normal, h)));
+    const float lh2 = Sq(saturate(dot(lighting.lightDir, h)));
+    const float r2 = Sq(surface.roughness);
     const float d2 = Sq(float(nh2 * (r2 - 1.0) + 1.00001)); //todo: check if this is right
-    const float normalization = params.roughness * 4.0 + 2.0;
-    float specularStrength = r2 / (d2 * max(0.1, lh2) * normalization);
-    const float3 baseLitColor = specularStrength * params.baseSpecular + params.baseDiffuse;
-    return params.lightColor * params.attenuation * baseLitColor;
+    const float normalization = surface.roughness * 4.0 + 2.0;
+    const float specularStrength = r2 / (d2 * max(0.1, lh2) * normalization);
+    const float3 baseLitColor = specularStrength * surface.baseSpecular + surface.baseDiffuse;
+    return lighting.color * lighting.attenuation * baseLitColor;
 }
 
-float3 CartoonBRDF(const BRDFParams params) {
-    const float3 h = SafeNormalize(params.lightDir + params.viewDir);
-    float specular  = normalize(dot(params.normal, h));
-    const float steps = max(params.roughness * 2, 0.01);
+float3 CartoonBRDF(BRDF_PARAMS) {
+    const float3 h = SafeNormalize(lighting.lightDir + viewDir);
+    float specular  = normalize(dot(surface.normal, h));
+    const float steps = max(surface.roughness * 2, 0.01);
     specular = round(specular * steps) / steps;
-    const float3 baseLitColor = specular * params.baseSpecular + params.baseDiffuse;
-    return params.lightColor * params.attenuation * baseLitColor;
+    const float3 baseLitColor = specular * surface.baseSpecular + surface.baseDiffuse;
+    return lighting.color * lighting.attenuation * baseLitColor;
 }
 
 #endif

@@ -26,12 +26,14 @@ namespace Passes {
             var finalColorDesc = TextureUtil.ColorTex(Constants.FinalColorTexName);
             finalColorDesc.enableRandomWrite = true;
             
+            //Debug.Log(MathUtil.MinBitvectorSize(Constants.MaximumLights));
+
             var cullingResultsDesc = new ComputeBufferDesc(
-                MathUtil.NextMultipleOf(Constants.MaximumLights, sizeof(uint)) * 
+                MathUtil.NextMultipleOf(Constants.MaximumLights, Constants.UIntBitSize) * 
                     viewportParams.TileCount.x * viewportParams.TileCount.y,
                 sizeof(uint)
             ) {
-                name = Constants.CullingResultsBufferName,
+                name = Constants.LightCullingResultsBufferName,
                 type = ComputeBufferType.Raw,
             };
 
@@ -46,7 +48,7 @@ namespace Passes {
         
         protected override void Render(LightingPassData passData, RenderGraphContext ctx) {
             var tileCount = viewportParams.TileCount;
-            ctx.cmd.SetGlobalBuffer(Constants.CullingResultsId, passData.LightingData.CullingResultsBuffer);
+            ctx.cmd.SetGlobalBuffer(Constants.LightCullingResultsId, passData.LightingData.CullingResultsBuffer);
 
             ctx.cmd.DispatchCompute(
                 shaderBundle.LightCullingShader, lightCullingKernelId, 

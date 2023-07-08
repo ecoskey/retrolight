@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
+using Util;
 using RendererListDesc = UnityEngine.Rendering.RendererUtils.RendererListDesc;
 
 namespace Passes {
@@ -21,14 +22,14 @@ namespace Passes {
             using var builder = CreatePass(out var passData);
 
             GBuffer gBuffer = new GBuffer(
-                CreateUseColorBuffer(builder, 0, Constants.AlbedoTexName),
+                CreateUseColorBuffer(builder, 0, Constants.DiffuseTexName),
+                CreateUseColorBuffer(builder, 1, Constants.SpecularTexName),
                 CreateUseDepthBuffer(builder, DepthAccess.Write, Constants.DepthTexName),
-                CreateUseColorBuffer(builder, 1, Constants.NormalTexName),
-                CreateUseColorBuffer(builder, 2, Constants.AttributesTexName)
+                CreateUseColorBuffer(builder, 2, Vector2.one, TextureUtil.Packed32Format, Constants.NormalTexName)
             );
             passData.GBuffer = gBuffer;
 
-            RendererListDesc gBufferRendererDesc = new RendererListDesc(Constants.GBufferPassId, cull, camera) {
+            var gBufferRendererDesc = new RendererListDesc(Constants.GBufferPassId, cull, camera) {
                 sortingCriteria = SortingCriteria.CommonOpaque,
                 renderQueueRange = RenderQueueRange.opaque
             };
@@ -42,10 +43,10 @@ namespace Passes {
             CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, passData.GBufferRendererList);
 
             var gBuffer = passData.GBuffer;
-            ctx.cmd.SetGlobalTexture(Constants.AlbedoTexId, gBuffer.Albedo);
+            ctx.cmd.SetGlobalTexture(Constants.DiffuseTexId, gBuffer.Diffuse);
+            ctx.cmd.SetGlobalTexture(Constants.SpecularTexId, gBuffer.Specular);
             ctx.cmd.SetGlobalTexture(Constants.DepthTexId, gBuffer.Depth);
             ctx.cmd.SetGlobalTexture(Constants.NormalTexId, gBuffer.Normal);
-            ctx.cmd.SetGlobalTexture(Constants.AttributesTexId, gBuffer.Attributes);
         }
     }
 }

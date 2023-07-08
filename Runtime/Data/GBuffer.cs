@@ -2,31 +2,30 @@ using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace Data {
     public readonly struct GBuffer {
-        public readonly TextureHandle Albedo;
+        public readonly TextureHandle Diffuse;
+        public readonly TextureHandle Specular;
         public readonly TextureHandle Depth;
-
         public readonly TextureHandle Normal;
 
         //public readonly TextureHandle Emission;
-        public readonly TextureHandle Attributes;
 
         public GBuffer(
-            TextureHandle albedo, TextureHandle depth, TextureHandle normal,
-            /*TextureHandle Emission,*/ TextureHandle attributes
+            TextureHandle diffuse, TextureHandle specular, TextureHandle depth, TextureHandle normal
+            /*TextureHandle Emission,*/ 
         ) {
-            Albedo = albedo;
+            Diffuse = diffuse;
+            Specular = specular;
             Depth = depth;
             Normal = normal;
             //Emission = emission;
-            Attributes = attributes;
         }
 
         public GBuffer ReadAll(RenderGraphBuilder builder) => new GBuffer(
-            builder.ReadTexture(Albedo),
+            builder.ReadTexture(Diffuse),
+            builder.ReadTexture(Specular),
             builder.ReadTexture(Depth),
-            builder.ReadTexture(Normal),
+            builder.ReadTexture(Normal)
             //builder.ReadTexture(Emission),
-            builder.ReadTexture(Attributes)
         );
     }
 }

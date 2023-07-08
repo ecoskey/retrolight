@@ -11,10 +11,17 @@ namespace Util {
             DefaultColorTexName = "ColorTex",
             DefaultDepthTexName = "DepthTex";
 
+        public static GraphicsFormat DefaultColorFormat =>
+            GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, IsSrgb);
+        public static GraphicsFormat Packed32Format =>
+            GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.ARGB2101010, IsSrgb);
+        public static GraphicsFormat HdrColorFormat =>
+            GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.DefaultHDR, IsSrgb);
+
         public static TextureDesc ColorTex(string name = DefaultColorTexName) => ColorTex(Vector2.one, name);
 
         public static TextureDesc ColorTex(Vector2 scale, string name = DefaultColorTexName) =>
-            ColorTex(scale, GraphicsFormatUtility.GetGraphicsFormat(RenderTextureFormat.Default, IsSrgb), name);
+            ColorTex(scale, DefaultColorFormat, name);
 
         public static TextureDesc ColorTex(
             Vector2 scale, GraphicsFormat format,

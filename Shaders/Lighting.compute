@@ -7,13 +7,6 @@
 #include "../ShaderLibrary/Viewport.hlsl"
 #include "../ShaderLibrary/Edges.hlsl"
 
-#define BUCKET_SIZE 32
-#define TILE_BUCKET_COUNT (MAX_LIGHTS / BUCKET_SIZE)
-
-uint LightCount; //todo: actually set from CPU
-StructuredBuffer<Light> Lights;
-ByteAddressBuffer CullingResults;
-
 RW_TEXTURE2D(float4, FinalColorTex);
 
 struct ThreadInfo {
@@ -25,46 +18,42 @@ struct ThreadInfo {
 
 Surface GetSurfaceGBuffer(PositionInputs inputs) {
     Surface surface;
-    const float4 albedo = LoadAlbedo(inputs.positionSS);
-    surface.color = albedo.rgb;
-    surface.alpha = albedo.a;
-    surface.normal = LoadNormal(inputs.positionSS);
-    const float4 attributes = LoadAttributes(inputs.positionSS);
-    surface.metallic = attributes.x;
-    surface.smoothness = attributes.y;
-    surface.depthEdgeStrength = attributes.z;
-    surface.normalEdgeStrength = attributes.w;
+    const float4 diffuseRoughness = LoadDiffuse(inputs.positionSS);
+    const float4 specularEdges = LoadSpecular(inputs.positionSS);
+    const float3 normal = LoadNormal(inputs.positionSS);
+    surface.baseDiffuse = diffuseRoughness.rgb;
+    surface.alpha = 1;
+    surface.roughness = diffuseRoughness.a;
+    surface.baseSpecular = specularEdges.rgb;
+    surface.edgeStrength = specularEdges.a;
+    surface.normal = SafeNormalize(normal);
     return surface;
 }
 
-float3 GetLighting(Surface surface, PositionInputs positionInputs, Light light) {
-    //const float2 edges = GetEdgeStrength(positionInputs.positionSS);
-    const BRDFParams params = GetBRDFParams(surface, positionInputs, light, 0);
-    return DirectBRDF(params);
-}
-
-[numthreads(8, 8, 1)]
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void Lighting(ThreadInfo input) {
     if (IsPixelOOB(input.dispatchId)) return;
-    const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
+    const uint globalTileOffset = TileIndex(input.id) * LIGHT_TILE_BUCKET_COUNT;
     const PositionInputs positionInputs = GetPositionInput(
         input.dispatchId, Resolution.zw,
         LOAD_TEXTURE2D(DepthTex, input.dispatchId).r,
         UNITY_MATRIX_I_VP, UNITY_MATRIX_V, input.id
     );
+    
     const Surface surface = GetSurfaceGBuffer(positionInputs);
     
-    float3 accLight = 0.025 * surface.color;
+    float3 accLight = 0.025 * surface.baseDiffuse;
     UNITY_LOOP
     for (uint i = 0; i * BUCKET_SIZE < MAX_LIGHTS; i++) {
         FinalColorTex[input.dispatchId] = 1;
         const uint lightsOffset = i * BUCKET_SIZE;
-        uint bucket = CullingResults.Load(globalTileOffset + i);
+        uint bucket = LightCullingResults.Load(globalTileOffset + i);
         while (bucket != 0) {
             const uint firstLightIndex = firstbitlow(bucket);
             ClearBit(bucket, firstLightIndex);
             const Light light = Lights[lightsOffset + firstLightIndex];
-            accLight += GetLighting(surface, positionInputs, light);
+            const LightingData lighting = GetLighting(light, surface.normal, positionInputs);
+            accLight += DirectBRDF(surface, lighting, GetViewDir(positionInputs.positionWS));
         }
     }
     FinalColorTex[input.dispatchId] = float4(accLight, surface.alpha);

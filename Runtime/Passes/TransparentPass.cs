@@ -13,9 +13,7 @@ namespace Passes {
         public TransparentPass(Retrolight pipeline) : base(pipeline) { }
 
         protected override string PassName => "Transparent Pass";
-
-        private Material testMaterial = CoreUtils.CreateEngineMaterial("Hidden/TestBlit");
-
+        
         public void Run(GBuffer gBuffer, LightInfo lightInfo, LightingData lightingData) {
             using var builder = CreatePass(out var passData);
             

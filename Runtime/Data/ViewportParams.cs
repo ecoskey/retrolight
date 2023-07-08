@@ -15,8 +15,8 @@ namespace Data {
             PixelCount = rtHandleProperties.currentViewportSize;
             Resolution = new Vector4(PixelCount.x, PixelCount.y, 1f / PixelCount.x, 1f / PixelCount.y);
             TileCount = new Vector2Int(
-                MathUtil.NextMultipleOf(PixelCount.x, Constants.SmallTile), 
-                MathUtil.NextMultipleOf(PixelCount.y, Constants.SmallTile)
+                MathUtil.NextMultipleOf(PixelCount.x, Constants.MediumTile), 
+                MathUtil.NextMultipleOf(PixelCount.y, Constants.MediumTile)
             );
             var scale = rtHandleProperties.rtHandleScale;
             ViewportScale = new Vector2(scale.x, scale.y);

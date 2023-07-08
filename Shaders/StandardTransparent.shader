@@ -10,8 +10,7 @@ Shader "Retrolight/StandardTransparent" {
 		_Metallic ("Metallic", Range(0, 1)) = 0
 		_Smoothness ("Smoothness", Range(0, 1)) = 0.5
 		
-		_DepthEdgeStrength ("Depth Edge Strength", Range(0, 1)) = 0
-		_NormalEdgeStrength ("Normal Edge Strength", Range(0, 1)) = 0
+		_DepthEdgeStrength ("Edge Strength", Range(0, 1)) = 0
 	}
 	SubShader {
 		Tags { 

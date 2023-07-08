@@ -11,6 +11,8 @@ public static class Constants {
         SmallTile = 8,
         MediumTile = 16;
 
+    public const int UIntBitSize = 32;
+
     public static readonly ShaderTagId 
         GBufferPassId = new ShaderTagId("RetrolightGBuffer"),
         DecalPassId = new ShaderTagId("RetrolightDecal"),
@@ -22,29 +24,29 @@ public static class Constants {
 
     public const string
         LightBufferName = "Lights",
-        CullingResultsBufferName = "CullingResults";
+        LightCullingResultsBufferName = "LightCullingResults";
         
     public static readonly int
         LightBufferId = Shader.PropertyToID(LightBufferName),
-        CullingResultsId = Shader.PropertyToID(CullingResultsBufferName);
+        LightCullingResultsId = Shader.PropertyToID(LightCullingResultsBufferName);
             
     public static readonly int
         DirectionalShadowAtlasId = Shader.PropertyToID("DirectionalShadowAtlas"),
         OtherShadowAtlasId = Shader.PropertyToID("OtherShadowAtlas"),
         DirectionalShadowMatricesId = Shader.PropertyToID("DirectionalShadowMatrices"),
         OtherShadowMatricesId = Shader.PropertyToID("OtherShadowMatrices");
-        
+
     public const string
-        AlbedoTexName = "AlbedoTex",
+        DiffuseTexName = "DiffuseTex",
+        SpecularTexName = "SpecularTex",
         DepthTexName = "DepthTex",
-        NormalTexName = "NormalTex",
-        AttributesTexName = "AttributesTex";
+        NormalTexName = "NormalTex";
 
     public static readonly int
-        AlbedoTexId = Shader.PropertyToID(AlbedoTexName),
+        DiffuseTexId = Shader.PropertyToID(DiffuseTexName),
+        SpecularTexId = Shader.PropertyToID(SpecularTexName),
         DepthTexId = Shader.PropertyToID(DepthTexName),
-        NormalTexId = Shader.PropertyToID(NormalTexName),
-        AttributesTexId = Shader.PropertyToID(AttributesTexName);
+        NormalTexId = Shader.PropertyToID(NormalTexName);
 
     public const string FinalColorTexName = "FinalColorTex";
     public static readonly int FinalColorTexId = Shader.PropertyToID(FinalColorTexName);

@@ -2,6 +2,7 @@
 #define RETROLIGHT_DITHERING_INCLUDED
 
 #include "Common.hlsl"
+#include "Viewport.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Filtering.hlsl"
 
 //bayer matrix values copied from Acerola on YT
@@ -56,6 +57,15 @@ QUANTIZE_TEMPLATE(real)
 QUANTIZE_TEMPLATE(real2)
 QUANTIZE_TEMPLATE(real3)
 QUANTIZE_TEMPLATE(real4)
+
+
+uint2 NoiseCoords(float3 cameraPos, uint2 screenPos) {
+    if (ORTHOGRAPHIC_CAMERA) return screenPos;
+    float2 positionWVS = TransformWorldToObjectDir(cameraPos).xy;
+    float2 scale = Resolution.x / unity_OrthoParams.x;
+    uint2 pixPos = round(screenPos + scale * positionWVS);
+    return pixPos;
+}
 
 #define FILTER_ARGS TEXTURE2D_PARAM(tex, smp), float2 uv, uint lod, float2 texelSize
 
