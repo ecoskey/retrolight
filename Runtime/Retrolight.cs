@@ -138,6 +138,8 @@ public sealed class Retrolight : RenderPipeline {
 
     protected override void Dispose(bool disposing) {
         if (!disposing) return;
+        
+        Blitter.Cleanup();
 
         setupPass.Dispose();
         gBufferPass.Dispose();
