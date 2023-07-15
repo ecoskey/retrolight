@@ -83,15 +83,16 @@ LightingData GetLighting(Light light, const float3 surfaceNormal, const Position
             lighting.lightDir = light.Direction();
             lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
             lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.05, noiseCoords), 8);
-            //if (light.Flags() & F_LIGHT_SHADOWED)
-                //params.attenuation *= GetDirectionalShadowAttenuation(positionInputs.positionWS, light.ShadowStrength());
+            if (light.Flags() & F_LIGHT_SHADOWED)
+                lighting.attenuation *= GetDirectionalShadowAttenuation(positionInputs.positionWS, light.ShadowStrength());
             break;
         case POINT_LIGHT:
+            // todo: light dir stuff?
             relativeLightPos = light.position - positionInputs.positionWS;
             lighting.lightDir = normalize(relativeLightPos);
             lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
             lighting.attenuation *= PointAttenuation(Length2(relativeLightPos), light.Range(), 1);
-            lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.1, noiseCoords), 6);
+            //lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.1, noiseCoords), 6);
             break;
         case SPOT_LIGHT:
             relativeLightPos = light.position - positionInputs.positionWS;
@@ -99,7 +100,7 @@ LightingData GetLighting(Light light, const float3 surfaceNormal, const Position
             lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
             //lighting.attenuation *= PointAttenuation(Length2(relativeLightPos), light.Range(), 1);
             lighting.attenuation *= SpotAttenuation(lighting.lightDir, light.Direction(), light.CosAngle());
-            lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.1, noiseCoords), 6);
+            //lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.1, noiseCoords), 6);
             break;
         default:
             lighting.lightDir = float3(0, 1, 0);
@@ -110,9 +111,7 @@ LightingData GetLighting(Light light, const float3 surfaceNormal, const Position
     return lighting;
 }
 
-#define BRDF_PARAMS Surface surface, LightingData lighting, float3 viewDir
-
-float3 DirectBRDF(BRDF_PARAMS) {
+float3 DirectBRDF(Surface surface, LightingData lighting, float3 viewDir) {
     //return surface.normal;
     //return IncomingLight(surface, light);
     const float3 h = SafeNormalize(lighting.lightDir + viewDir);
@@ -126,7 +125,7 @@ float3 DirectBRDF(BRDF_PARAMS) {
     return lighting.color * lighting.attenuation * baseLitColor;
 }
 
-float3 CartoonBRDF(BRDF_PARAMS) {
+float3 CartoonBRDF(Surface surface, LightingData lighting, float3 viewDir) {
     const float3 h = SafeNormalize(lighting.lightDir + viewDir);
     float specular  = normalize(dot(surface.normal, h));
     const float steps = max(surface.roughness * 2, 0.01);

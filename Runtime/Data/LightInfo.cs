@@ -1,16 +1,16 @@
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 
 namespace Data {
-    public struct LightInfo {
+    public readonly struct LightInfo {
         public readonly int LightCount;
-        public readonly ComputeBufferHandle LightsBuffer;
+        public readonly BufferHandle LightsBuffer;
 
-        public LightInfo(int lightCount, ComputeBufferHandle lightsBuffer) {
+        public LightInfo(int lightCount, BufferHandle lightsBuffer) {
             LightCount = lightCount;
             LightsBuffer = lightsBuffer;
         }
 
         public LightInfo ReadAll(RenderGraphBuilder builder) =>
-            new LightInfo(LightCount, builder.ReadComputeBuffer(LightsBuffer));
+            new LightInfo(LightCount, builder.ReadBuffer(LightsBuffer));
     }
 }

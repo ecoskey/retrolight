@@ -26,7 +26,7 @@ Surface GetSurfaceGBuffer(PositionInputs inputs) {
     surface.roughness = diffuseRoughness.a;
     surface.baseSpecular = specularEdges.rgb;
     surface.edgeStrength = specularEdges.a;
-    surface.normal = SafeNormalize(normal);
+    surface.normal = normal;
     return surface;
 }
 
@@ -44,7 +44,7 @@ void Lighting(ThreadInfo input) {
     
     float3 accLight = 0.025 * surface.baseDiffuse;
     UNITY_LOOP
-    for (uint i = 0; i * BUCKET_SIZE < MAX_LIGHTS; i++) {
+    for (uint i = 0; i * BUCKET_SIZE < LightCount; i++) {
         FinalColorTex[input.dispatchId] = 1;
         const uint lightsOffset = i * BUCKET_SIZE;
         uint bucket = LightCullingResults.Load(globalTileOffset + i);

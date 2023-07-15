@@ -126,7 +126,7 @@ void LightCulling(const ThreadInfo input) {
     }
 
     UNITY_LOOP
-    for (i = input.index; i < MAX_LIGHTS; i += TILE_SIZE * TILE_SIZE) {
+    for (i = input.index; i < LightCount; i += TILE_SIZE * TILE_SIZE) {
         AllowLight(i);
     }
 

@@ -14,9 +14,9 @@ namespace Passes {
         protected Camera camera => pipeline.FrameData.Camera;
         protected CullingResults cull => pipeline.FrameData.Cull;
         protected ViewportParams viewportParams => pipeline.FrameData.ViewportParams;
-        protected bool usePostFx => pipeline.UsePostFx;
-        protected PostFxSettings postFxSettings => pipeline.PostFxSettings;
-
+        protected bool usePostFx => pipeline.AllowPostFx;
+        protected bool useHDR => pipeline.FrameData.UseHDR;
+        
         protected RenderPass(Retrolight pipeline) {
             this.pipeline = pipeline;
         }
@@ -104,7 +104,7 @@ namespace Passes {
             string name = TextureUtil.DefaultDepthTexName
         ) => builder.UseDepthBuffer(CreateDepthTex(scale, name), access);
 
-        protected ComputeBufferHandle CreateWriteComputeBuffer(RenderGraphBuilder builder, ComputeBufferDesc desc) =>
-            builder.WriteComputeBuffer(renderGraph.CreateComputeBuffer(desc));
+        protected BufferHandle CreateWriteBuffer(RenderGraphBuilder builder, BufferDesc desc) =>
+            builder.WriteBuffer(renderGraph.CreateBuffer(desc));
     }
 }

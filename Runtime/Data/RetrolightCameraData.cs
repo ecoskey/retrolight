@@ -5,15 +5,13 @@ namespace Data {
     [RequireComponent(typeof(Camera))]
     [DisallowMultipleComponent]
     public class RetrolightCameraData : MonoBehaviour {
-        [SerializeField] private bool renderLighting;
-        [SerializeField] private bool renderShadows;
-        [SerializeField] private bool enablePostFX;
-        [SerializeField] private PostFxSettings postFxSettings;
+        [SerializeField] private bool renderLighting = true;
+        [SerializeField] private bool renderShadows = true;
+        [SerializeField] private bool enablePostFX = true;
 
         public bool RenderLighting => renderLighting;
         public bool RenderShadows => renderShadows;
         public bool EnablePostFx => enablePostFX;
-        public PostFxSettings PostFxSettings => postFxSettings;
 
         public Vector3 PreviousPosition { get; private set; }
         public Quaternion PreviousRotation { get; private set; }

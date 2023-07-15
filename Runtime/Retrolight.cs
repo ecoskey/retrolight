@@ -15,8 +15,8 @@ public sealed class Retrolight : RenderPipeline {
     internal readonly ShaderBundle ShaderBundle;
         
     internal readonly int PixelRatio;
-    internal readonly bool UsePostFx;
-    internal readonly PostFxSettings PostFxSettings;
+    internal readonly bool AllowPostFx;
+    private readonly bool allowHDR;
 
     internal FrameData FrameData { get; private set; }
 
@@ -30,7 +30,7 @@ public sealed class Retrolight : RenderPipeline {
 
     public Retrolight(
         ShaderBundle shaderBundle, int pixelRatio,
-        bool usePostFx, PostFxSettings postFxSettings
+        bool allowPostFx, bool allowHDR
     ) {
         GraphicsSettings.lightsUseLinearIntensity = true;
         GraphicsSettings.useScriptableRenderPipelineBatching = true;
@@ -40,8 +40,8 @@ public sealed class Retrolight : RenderPipeline {
         ShaderBundle = shaderBundle;
             
         PixelRatio = pixelRatio;
-        UsePostFx = usePostFx;
-        PostFxSettings = postFxSettings;
+        AllowPostFx = allowPostFx;
+        this.allowHDR = allowHDR;
 
         setupPass = new SetupPass(this);
         gBufferPass = new GBufferPass(this);
@@ -50,7 +50,8 @@ public sealed class Retrolight : RenderPipeline {
         postFxPass = new PostFxPass(this);
         finalPass = new FinalPass(this);
 
-        RTHandles.Initialize(1, 1);
+        RTHandles.Initialize(1, 1); //todo: what is this even
+        Debug.LogWarning("REMBER TO FIX BLIT SHADER, ISN'T REALLY NECESSARY BUT YOU SHOULD");
         Blitter.Initialize(shaderBundle.BlitShader, shaderBundle.BlitWithDepthShader);
     }
 
@@ -77,7 +78,7 @@ public sealed class Retrolight : RenderPipeline {
         CullingResults cull = ctx.Cull(ref cullingParams);
         RTHandles.SetReferenceSize(camera.pixelWidth / PixelRatio, camera.pixelHeight / PixelRatio);
         var viewportParams = new ViewportParams(RTHandles.rtHandleProperties);
-        FrameData = new FrameData(camera, cull, viewportParams);
+        FrameData = new FrameData(camera, cull, viewportParams, allowHDR);
 
         using var snapContext = SnappingUtil.SnapCamera(camera, viewportParams); //todo: move to FrameData
 
@@ -89,29 +90,22 @@ public sealed class Retrolight : RenderPipeline {
             commandBuffer = cmd,
             currentFrameIndex = Time.frameCount,
         };
+
+        var skyboxRenderer = ctx.CreateSkyboxRendererList(camera);
             
         using (RenderGraph.RecordAndExecute(renderGraphParams)) {
             var lightInfo = setupPass.Run();
             var gBuffer = gBufferPass.Run();
-            var lightingData = lightingPass.Run(gBuffer, lightInfo);
-            transparentPass.Run(gBuffer, lightInfo, lightingData);
+            var lightingData = lightingPass.Run(gBuffer, lightInfo, skyboxRenderer);
+            //transparentPass.Run(gBuffer, lightInfo, lightingData);
             
-            #if UNITY_EDITOR
-            if (
-                camera.cameraType != CameraType.SceneView ||
-                SceneView.currentDrawingSceneView.sceneViewState.showImageEffects
-            ) {
-                postFxPass.Run(lightingData.FinalColorTex, PostFxSettings);
-            }
-            #else
-            postFxPass.Run(lightingData.FinalColorTex, PostFxSettings);
-            #endif
+            postFxPass.Run(lightingData.FinalColorTex);
             
             finalPass.Run(lightingData.FinalColorTex, snapContext.ViewportShift);
         }
         
 
-        switch (camera.clearFlags) {
+        /*switch (camera.clearFlags) {
             case CameraClearFlags.Skybox:  
                 ctx.DrawSkybox(camera);
                 break;
@@ -119,7 +113,7 @@ public sealed class Retrolight : RenderPipeline {
             case CameraClearFlags.Depth:   break;
             case CameraClearFlags.Nothing: break;
             default: throw new ArgumentOutOfRangeException();
-        }
+        }*/
             
         ctx.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);

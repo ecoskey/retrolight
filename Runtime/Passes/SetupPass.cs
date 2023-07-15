@@ -29,11 +29,11 @@ namespace Passes {
             
             int lightCount = Math.Min(passData.Lights.Length, Constants.MaximumLights);
             
-            var lightsDesc = new ComputeBufferDesc(Constants.MaximumLights, PackedLight.Stride) {
+            var lightsDesc = new BufferDesc(Constants.MaximumLights, PackedLight.Stride) {
                 name = Constants.LightBufferName,
-                type = ComputeBufferType.Structured
+                target = GraphicsBuffer.Target.Structured
             };
-            var lightInfo = new LightInfo(lightCount, CreateWriteComputeBuffer(builder, lightsDesc));
+            var lightInfo = new LightInfo(lightCount, CreateWriteBuffer(builder, lightsDesc));
             passData.LightInfo = lightInfo;
             
             return lightInfo;
@@ -61,7 +61,7 @@ namespace Passes {
             //todo: BAD BAD BAD THIS IS AWFUL
             //sets a float-backed value on the GPU, NOT AN INTEGER
             //so, lightCount is many many many lights right now
-            //ctx.cmd.SetGlobalInteger(Constants.LightCountId, lightCount);
+            ctx.cmd.SetGlobalInteger(Constants.LightCountId, lightCount);
             ctx.cmd.SetGlobalBuffer(Constants.LightBufferId, passData.LightInfo.LightsBuffer);
         }
 

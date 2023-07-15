@@ -3,11 +3,11 @@ using UnityEngine.Experimental.Rendering.RenderGraphModule;
 namespace Data {
     public struct LightingData {
         public readonly TextureHandle FinalColorTex;
-        public readonly ComputeBufferHandle CullingResultsBuffer;
+        public readonly BufferHandle CullingResultsBuffer;
         //public readonly TextureHandle DirectionalShadowAtlas/*, OtherShadowAtlas*/;
 
         public LightingData(
-            TextureHandle finalColorTex, ComputeBufferHandle cullingResultsBuffer//,
+            TextureHandle finalColorTex, BufferHandle cullingResultsBuffer//,
             // directionalShadowAtlas//, TextureHandle otherShadowAtlas
         ) {
             FinalColorTex = finalColorTex;
@@ -18,14 +18,14 @@ namespace Data {
 
         public LightingData ReadAll(RenderGraphBuilder builder) => new LightingData(
             builder.ReadTexture(FinalColorTex), 
-            builder.ReadComputeBuffer(CullingResultsBuffer)/*,
+            builder.ReadBuffer(CullingResultsBuffer)/*,
             builder.ReadTexture(DirectionalShadowAtlas),
             builder.ReadTexture(OtherShadowAtlas)*/
         );
         
         public LightingData ReadLighting(RenderGraphBuilder builder) => new LightingData(
             builder.ReadTexture(FinalColorTex), 
-            builder.ReadComputeBuffer(CullingResultsBuffer)/*,
+            builder.ReadBuffer(CullingResultsBuffer)/*,
             DirectionalShadowAtlas,
             OtherShadowAtlas*/
         );

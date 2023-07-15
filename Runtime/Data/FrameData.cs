@@ -6,11 +6,13 @@ namespace Data {
         public readonly Camera Camera;
         public readonly CullingResults Cull;
         public readonly ViewportParams ViewportParams;
+        public readonly bool UseHDR;
 
-        public FrameData(Camera camera, CullingResults cull, ViewportParams viewportParams) {
+        public FrameData(Camera camera, CullingResults cull, ViewportParams viewportParams, bool allowHDR) {
             Camera = camera;
             Cull = cull;
             ViewportParams = viewportParams;
+            UseHDR = allowHDR && camera.allowHDR;
         }
     }
 }

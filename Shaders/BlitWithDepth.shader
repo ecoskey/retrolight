@@ -8,7 +8,7 @@ Shader "Hidden/Retrolight/BlitWithDepth" {
 		ZTest Always
 		ZWrite Off
 		Cull Off
-		Blend One One
+		Blend SrcAlpha OneMinusSrcAlpha
 		
 		HLSLINCLUDE
 		#pragma vertex FullscreenVertex

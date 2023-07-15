@@ -84,7 +84,7 @@ struct Light {
     }
 };
 
-uint LightCount; //todo: actually set from CPU
+int LightCount; //todo: actually set from CPU
 StructuredBuffer<Light> Lights;
 
 #endif

@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using Data;
+using UnityEngine.Rendering;
 using Util;
 
 namespace Passes {
@@ -9,6 +10,7 @@ namespace Passes {
 
         public class LightingPassData {
             public LightingData LightingData;
+            public RendererList SkyboxRenderer;
         }
 
         public LightingPass(Retrolight pipeline) : base(pipeline) {
@@ -18,28 +20,28 @@ namespace Passes {
 
         protected override string PassName => "Lighting Pass";
         
-        public LightingData Run(GBuffer gBuffer, LightInfo lightInfo) {
+        public LightingData Run(GBuffer gBuffer, LightInfo lightInfo, RendererList skyboxRenderer) {
             using var builder = CreatePass(out var passData);
             gBuffer.ReadAll(builder);
             lightInfo.ReadAll(builder);
             
             var finalColorDesc = TextureUtil.ColorTex(Constants.FinalColorTexName);
             finalColorDesc.enableRandomWrite = true;
-            
-            //Debug.Log(MathUtil.MinBitvectorSize(Constants.MaximumLights));
 
-            var cullingResultsDesc = new ComputeBufferDesc(
+            passData.SkyboxRenderer = skyboxRenderer;
+            
+            var cullingResultsDesc = new BufferDesc(
                 MathUtil.NextMultipleOf(Constants.MaximumLights, Constants.UIntBitSize) * 
                     viewportParams.TileCount.x * viewportParams.TileCount.y,
                 sizeof(uint)
             ) {
                 name = Constants.LightCullingResultsBufferName,
-                type = ComputeBufferType.Raw,
+                target = GraphicsBuffer.Target.Raw
             };
 
             var lightingData = new LightingData(
                 CreateWriteColorTex(builder, finalColorDesc), 
-                CreateWriteComputeBuffer(builder, cullingResultsDesc)
+                CreateWriteBuffer(builder, cullingResultsDesc)
             );
             passData.LightingData = lightingData;
             
@@ -47,6 +49,8 @@ namespace Passes {
         }
         
         protected override void Render(LightingPassData passData, RenderGraphContext ctx) {
+            //CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, passData.SkyboxRenderer);
+            
             var tileCount = viewportParams.TileCount;
             ctx.cmd.SetGlobalBuffer(Constants.LightCullingResultsId, passData.LightingData.CullingResultsBuffer);
 

@@ -3,15 +3,14 @@ using UnityEngine;
 
 
 namespace Data {
-    [Serializable]
     public struct BloomSettings {
-        [SerializeField] private bool enableBloom;
-        [SerializeField, Range(0, 16)] private int maxIterations;
-        [SerializeField, Min(1)] private int downscaleLimit;
+        private bool enableBloom;
+        private int maxIterations;
+        private int downscaleLimit;
         //[SerializeField] private bool highQuality;
-        [SerializeField, Min(0)] private float threshold;
-        [SerializeField, Range(0, 1)] private float knee;
-        [SerializeField, Min(0)] private float intensity;
+        private float threshold;
+        private float knee;
+        private float intensity;
 
         public bool EnableBloom => enableBloom;
         public int MaxIterations => maxIterations;
