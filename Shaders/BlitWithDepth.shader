@@ -14,6 +14,7 @@ Shader "Hidden/Retrolight/BlitWithDepth" {
 		#pragma vertex FullscreenVertex
 		#pragma fragment BlitFragment
 		#include "../ShaderLibrary/Common.hlsl"
+		#include "../ShaderLibrary/Samplers.hlsl"
 
 		TEXTURE2D(_BlitTexture);
 		TEXTURE2D(_InputDepthTexture);

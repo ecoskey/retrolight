@@ -80,7 +80,7 @@ GBufferOut GBufferFragment(V2F input)
     GBufferOut output;
     output.diffuse = float4(surface.baseDiffuse, surface.roughness);
     output.specular = float4(surface.baseSpecular, surface.edgeStrength);
-    output.normal = surface.normal;
+    output.normal = (surface.normal + 1) / 2;
     
     return output;
 }

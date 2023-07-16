@@ -58,9 +58,6 @@ namespace Passes {
             ctx.cmd.SetBufferData(passData.LightInfo.LightsBuffer, packedLights, 0, 0, lightCount);
             packedLights.Dispose();
             
-            //todo: BAD BAD BAD THIS IS AWFUL
-            //sets a float-backed value on the GPU, NOT AN INTEGER
-            //so, lightCount is many many many lights right now
             ctx.cmd.SetGlobalInteger(Constants.LightCountId, lightCount);
             ctx.cmd.SetGlobalBuffer(Constants.LightBufferId, passData.LightInfo.LightsBuffer);
         }

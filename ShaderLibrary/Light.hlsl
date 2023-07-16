@@ -12,7 +12,8 @@
 #define MAX_LIGHTS 1024
 #define LIGHT_TILE_BUCKET_COUNT TILE_BUCKET_COUNT(MAX_LIGHTS)
 
-//todo: look into utilities in Core RP lib Packing.hlsl 
+//todo: look into utilities in Core RP lib Packing.hlsl
+//todo: make sure this packs correctly
 struct Light {
     float3 position;
     uint type2_flags6_shadowIndex8_range16; //flags are currently unused, possibly layer mask?
@@ -73,7 +74,7 @@ struct Light {
                 f16tof32(direction48_shadowStrength16.y)
             );
         #endif
-    }
+    } 
     
     real ShadowStrength() {
         #if REAL_IS_HALF
@@ -84,7 +85,7 @@ struct Light {
     }
 };
 
-int LightCount; //todo: actually set from CPU
+uint LightCount; //todo: actually set from CPU
 StructuredBuffer<Light> Lights;
 
 #endif

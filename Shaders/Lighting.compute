@@ -43,6 +43,7 @@ void Lighting(ThreadInfo input) {
     const Surface surface = GetSurfaceGBuffer(positionInputs);
     
     float3 accLight = 0.025 * surface.baseDiffuse;
+    
     UNITY_LOOP
     for (uint i = 0; i * BUCKET_SIZE < LightCount; i++) {
         FinalColorTex[input.dispatchId] = 1;
@@ -56,5 +57,7 @@ void Lighting(ThreadInfo input) {
             accLight += DirectBRDF(surface, lighting, GetViewDir(positionInputs.positionWS));
         }
     }
-    FinalColorTex[input.dispatchId] = float4(accLight, surface.alpha);
+    const float2 edges = GetEdgeStrength(positionInputs.positionSS);
+    const float modifier = edges.y > edges.x ? surface.edgeStrength : -surface.edgeStrength;
+    FinalColorTex[input.dispatchId] = float4(accLight + modifier, 1);
 }

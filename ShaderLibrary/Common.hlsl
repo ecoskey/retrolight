@@ -22,15 +22,7 @@
 
 #define ORTHOGRAPHIC_CAMERA unity_OrthoParams.w
 
-#define POINT_SAMPLER sampler_PointClamp
-#define LINEAR_SAMPLER sampler_LinearClamp
-#define BILINEAR_SAMPLER sampler_BilinearClamp
-
 #define ACCESS_PROP(prop) UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, prop)
-
-SAMPLER(POINT_SAMPLER);
-SAMPLER(LINEAR_SAMPLER);
-SAMPLER(BILINEAR_SAMPLER);
 
 uint2 PackFloat3(float3 src) {
     return uint2(

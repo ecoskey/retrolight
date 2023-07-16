@@ -4,6 +4,7 @@
 
 #include "../ShaderLibrary/Filtering.hlsl"
 #include "../ShaderLibrary/Viewport.hlsl"
+#include "../ShaderLibrary/Samplers.hlsl"
 
 TEXTURE2D(Source);
 float4 SourceParams; //xy is rthandle scale, zw is 1/scaled resolution

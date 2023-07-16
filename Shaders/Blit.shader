@@ -14,15 +14,42 @@ Shader "Hidden/Retrolight/Blit" {
 		#pragma multi_compile _ BLIT_DECODE_HDR
 		#define TEXTURE2D_X TEXTURE2D
 		#define SAMPLE_TEXTURE2D_X_LOD SAMPLE_TEXTURE2D_LOD
-		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+		#include "../ShaderLibrary/Common.hlsl"
 		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 		#include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
+
+		Varyings CorrectVert(Attributes input) {
+		    Varyings output = Vert(input);
+			#if UNITY_UV_STARTS_AT_TOP
+		    if (_ProjectionParams.x >= 0)
+		        output.texcoord.y = 1 - output.texcoord.y;
+		    #endif
+		    return output;
+		}
+
+		Varyings CorrectVertQuad(Attributes input) {
+		    Varyings output = VertQuad(input);
+			#if UNITY_UV_STARTS_AT_TOP
+		    if (_ProjectionParams.x >= 0)
+		        output.texcoord.y = 1 - output.texcoord.y;
+		    #endif
+		    return output;
+		}
+
+		Varyings CorrectVertQuadPadding(Attributes input) {
+		    Varyings output = VertQuadPadding(input);
+			#if UNITY_UV_STARTS_AT_TOP
+		    if (_ProjectionParams.x >= 0)
+		        output.texcoord.y = 1 - output.texcoord.y;
+		    #endif
+		    return output;
+		}
 		ENDHLSL
 		
 		Pass {
 			Name "BlitNearest"
 			HLSLPROGRAM
-			#pragma vertex Vert
+			#pragma vertex CorrectVert
 			#pragma fragment FragNearest
 			ENDHLSL
 		}
@@ -30,7 +57,7 @@ Shader "Hidden/Retrolight/Blit" {
 		Pass {
 			Name "BlitBilinear"
 			HLSLPROGRAM
-			#pragma vertex Vert
+			#pragma vertex CorrectVert
 			#pragma fragment FragBilinear
 			ENDHLSL
 		}
@@ -38,7 +65,7 @@ Shader "Hidden/Retrolight/Blit" {
 		Pass {
 			Name "BlitQuadNearest"
 			HLSLPROGRAM
-			#pragma vertex VertQuad
+			#pragma vertex CorrectVertQuad
 			#pragma fragment FragNearest
 			ENDHLSL
 		}
@@ -46,7 +73,7 @@ Shader "Hidden/Retrolight/Blit" {
 		Pass {
 			Name "BlitQuadBilinear"
 			HLSLPROGRAM
-			#pragma vertex VertQuad
+			#pragma vertex CorrectVertQuad
 			#pragma fragment FragBilinear
 			ENDHLSL
 		}
@@ -54,7 +81,7 @@ Shader "Hidden/Retrolight/Blit" {
 		Pass {
 			Name "BlitQuadPaddingNearest"
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragNearest
 			ENDHLSL
 		}
@@ -62,7 +89,7 @@ Shader "Hidden/Retrolight/Blit" {
 		Pass {
 			Name "BlitQuadPaddingBilinear"
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragBilinear
 			ENDHLSL
 		}
@@ -70,7 +97,7 @@ Shader "Hidden/Retrolight/Blit" {
 		Pass {
 			Name "BlitQuadPaddingNearestRepeat"
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragNearestRepeat
 			ENDHLSL
 		}
@@ -78,7 +105,7 @@ Shader "Hidden/Retrolight/Blit" {
 		Pass {
 			Name "BlitQuadPaddingBilinearRepeat"
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragBilinearRepeat
 			ENDHLSL
 		}
@@ -86,7 +113,7 @@ Shader "Hidden/Retrolight/Blit" {
 		Pass {
 			Name "BlitOctahedralPadding"
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragOctahedralProject //todo: this?
 			ENDHLSL
 		}
@@ -95,7 +122,7 @@ Shader "Hidden/Retrolight/Blit" {
 			Name "BlitQuadPaddingNearestMultiply"
 			Blend DstColor Zero
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragNearest
 			ENDHLSL
 		}
@@ -104,7 +131,7 @@ Shader "Hidden/Retrolight/Blit" {
 			Name "BlitQuadPaddingBilinearMultiply"
 			Blend DstColor Zero
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragBilinear
 			ENDHLSL
 		}
@@ -113,7 +140,7 @@ Shader "Hidden/Retrolight/Blit" {
 			Name "BlitQuadPaddingNearestMultiplyRepeat"
 			Blend DstColor Zero
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragNearestRepeat
 			ENDHLSL
 		}
@@ -122,7 +149,7 @@ Shader "Hidden/Retrolight/Blit" {
 			Name "BlitQuadPaddingBilinearMultiplyRepeat"
 			Blend DstColor Zero
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragBilinearRepeat
 			ENDHLSL
 		}
@@ -131,7 +158,7 @@ Shader "Hidden/Retrolight/Blit" {
 			Name "BlitOctahedralPaddingMultiply"
 			Blend DstColor Zero
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragOctahedralProject
 			ENDHLSL
 		}
@@ -140,7 +167,7 @@ Shader "Hidden/Retrolight/Blit" {
 			Name "BlitCubeToOctahedral2DQuad"
 			//todo: ??????????
 			HLSLPROGRAM
-			#pragma vertex VertQuad
+			#pragma vertex CorrectVertQuad
 			#pragma fragment FragOctahedralProject
 			ENDHLSL
 		}
@@ -149,7 +176,7 @@ Shader "Hidden/Retrolight/Blit" {
 			Name "BlitCubeToOctahedral2DQuadPadding"
 			//todo: ??????????
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragOctahedralProject
 			ENDHLSL
 		}
@@ -158,7 +185,7 @@ Shader "Hidden/Retrolight/Blit" {
 			Name "BlitCubeToOctahedral2DQuadSingleChannel"
 			//todo: ??????????
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragOctahedralProject
 			ENDHLSL
 		}
@@ -167,7 +194,7 @@ Shader "Hidden/Retrolight/Blit" {
 			Name "BlitQuadSingleChannel"
 			//todo: ??????????
 			HLSLPROGRAM
-			#pragma vertex VertQuadPadding
+			#pragma vertex CorrectVertQuadPadding
 			#pragma fragment FragOctahedralProject
 			ENDHLSL
 		}

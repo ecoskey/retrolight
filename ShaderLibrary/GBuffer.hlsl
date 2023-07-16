@@ -2,6 +2,7 @@
 #define RETROLIGHT_GBUFFER_INCLUDED
 
 #include "Common.hlsl"
+#include "Samplers.hlsl"
 
 TEXTURE2D(DiffuseTex); // stores diffuse color & roughness
 TEXTURE2D(SpecularTex); // stores specular color & effect edge strength

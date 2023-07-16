@@ -46,30 +46,26 @@ float GetNormalEdgeIndicator(int2 pos, float depth, float3 normal) {
     return step(0.1, indicator);
 }
 
-/*float2 GetEdgeStrength(int2 pos) {
-    const float2 edgeStrengths = LoadAttributes(pos).zw;
-    const float depthEdgeStrength = edgeStrengths.x;
-    const float normalEdgeStrength = edgeStrengths.y;
+float2 GetEdgeStrength(int2 pos) {
+    const float edgeStrength = LoadSpecular(pos).w;
 
     float depth;
     float3 normal;
-    
-    if (depthEdgeStrength > 0 || normalEdgeStrength > 0) {
-        depth = LoadEyeDepth(pos);
-        normal = LoadNormal(pos);
-    }
 
     float dei = 0;
-    if (depthEdgeStrength > 0) {
-        dei = GetDepthEdgeIndicator(pos, depth);
-    }
-
     float nei = 0;
-    if (normalEdgeStrength > 0) {
+    
+    if (edgeStrength > 0) {
+        depth = LoadEyeDepth(pos);
+        normal = LoadNormal(pos);
+
+        dei = GetDepthEdgeIndicator(pos, depth);
         nei = GetNormalEdgeIndicator(pos, depth, normal);
     }
     
     return float2(dei, nei);
-}*/
+}
+
+
 
 #endif

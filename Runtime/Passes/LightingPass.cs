@@ -25,7 +25,10 @@ namespace Passes {
             gBuffer.ReadAll(builder);
             lightInfo.ReadAll(builder);
             
-            var finalColorDesc = TextureUtil.ColorTex(Constants.FinalColorTexName);
+            var finalColorDesc = TextureUtil.ColorTex(
+                Vector2.one, useHDR ? TextureUtil.HdrColorFormat : TextureUtil.DefaultColorFormat, 
+                Constants.FinalColorTexName
+            );
             finalColorDesc.enableRandomWrite = true;
 
             passData.SkyboxRenderer = skyboxRenderer;
