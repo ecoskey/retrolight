@@ -3,9 +3,6 @@
 
 #include "Light.hlsl"
 
-#define BUCKET_SIZE 32
-#define TILE_BUCKET_COUNT(Num) ((Num + BUCKET_SIZE - 1) / BUCKET_SIZE)
-
 struct AABB {
     float3 min;
     float3 max;

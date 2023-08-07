@@ -4,6 +4,14 @@
 #include "../ShaderLibrary/Viewport.hlsl"
 #include "../ShaderLibrary/Culling.hlsl"
 
+#define MAX_LIGHTS 1024
+
+#define BUCKET_SIZE 32
+#define TILE_BUCKET_COUNT(Num) ((Num + BUCKET_SIZE - 1) / BUCKET_SIZE)
+#define LIGHT_TILE_BUCKET_COUNT TILE_BUCKET_COUNT(MAX_LIGHTS)
+
+uint LightCount;
+StructuredBuffer<Light> Lights;
 RWByteAddressBuffer LightCullingResults;
 
 groupshared uint tile[LIGHT_TILE_BUCKET_COUNT];

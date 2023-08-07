@@ -5,6 +5,7 @@
 #include "../ShaderLibrary/Light.hlsl"
 #include "../ShaderLibrary/Lighting.hlsl"
 #include "../ShaderLibrary/Viewport.hlsl"
+#include "../ShaderLibrary/Culling.hlsl"
 #include "../ShaderLibrary/Edges.hlsl"
 
 RW_TEXTURE2D(float4, FinalColorTex);
@@ -57,7 +58,8 @@ void Lighting(ThreadInfo input) {
             accLight += DirectBRDF(surface, lighting, GetViewDir(positionInputs.positionWS));
         }
     }
-    const float2 edges = GetEdgeStrength(positionInputs.positionSS);
-    const float modifier = edges.y > edges.x ? surface.edgeStrength : -surface.edgeStrength;
-    FinalColorTex[input.dispatchId] = float4(accLight + modifier, 1);
+    /*const float2 edges = GetEdgeStrength(positionInputs.positionSS);
+    const float modifier = edges.y > edges.x ? surface.edgeStrength : -surface.edgeStrength;*/
+    
+    FinalColorTex[input.dispatchId] = float4(accLight/* + modifier*/, 1);
 }

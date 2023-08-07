@@ -3,6 +3,7 @@
 
 #include "../ShaderLibrary/Common.hlsl"
 #include "../ShaderLibrary/Lighting.hlsl"
+#include "../ShaderLibrary/GBufferOut.hlsl"
 
 TEXTURE2D(_MainTex);
 SAMPLER(sampler_MainTex);
@@ -35,11 +36,7 @@ struct V2F {
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
-struct GBufferOut {
-    float4 diffuse : SV_Target0;
-    float4 specular : SV_Target1;
-    float3 normal : SV_Target2;
-};
+
 
 float3 GetNormalTS(float2 baseUV)
 {
@@ -72,17 +69,10 @@ GBufferOut GBufferFragment(V2F input)
 
     const float3 normal = normalize(NormalTangentToWorld(GetNormalTS(input.uv), input.normalWS, input.tangentWS));
 
-    Surface surface = GetMetallicSurface(
-        color.rgb, 1, normal, ACCESS_PROP(_Metallic),
+    return GetGBufferOut(GetMetallicSurface(
+        color.rgb, 0, normal, ACCESS_PROP(_Metallic),
         ACCESS_PROP(_Smoothness), ACCESS_PROP(_EdgeStrength)
-    );
-
-    GBufferOut output;
-    output.diffuse = float4(surface.baseDiffuse, surface.roughness);
-    output.specular = float4(surface.baseSpecular, surface.edgeStrength);
-    output.normal = (surface.normal + 1) / 2;
-    
-    return output;
+    ));
 }
 
 #endif

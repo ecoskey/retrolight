@@ -1,34 +1,25 @@
 using System;
 using System.Runtime.InteropServices;
+using Unity.Mathematics;
+using static Unity.Mathematics.math;
 using UnityEngine;
 using UnityEngine.Rendering;
+// ReSharper disable PrivateFieldCanBeConvertedToLocalVariable
 
 namespace Data {
     [StructLayout(LayoutKind.Sequential)]
-    public struct PackedLight {
-        private Vector3 position;
+    public readonly struct PackedLight {
+        private readonly float3 position;
         
-        private byte type2_flags6;
-        private byte shadowIndex;
-        private ushort range;
-        
-        public byte ShadowIndex { set => shadowIndex = value; }
+        private readonly byte type2_flags6;
+        private readonly byte shadowIndex;
+        private readonly half range;
 
-        private ushort colorR, colorG, colorB;
-        private ushort cosAngle;
+        private readonly half3 color;
+        private readonly half cosAngle;
 
-        private ushort dirX, dirY, dirZ;
-        private ushort shadowStrength;
-
-        public const int Stride =
-            sizeof(float) * 3
-            + sizeof(byte)
-            + sizeof(byte)
-            + sizeof(ushort)
-            + sizeof(ushort) * 3
-            + sizeof(ushort)
-            + sizeof(ushort) * 3
-            + sizeof(ushort);
+        private readonly half3 dir;
+        private readonly half shadowStrength;
 
         private enum PackedLightType : byte {
             Directional = 0,
@@ -39,31 +30,27 @@ namespace Data {
         [Flags]
         private enum PackedLightFlags : byte {
             None = 0,
-            Shadowed = 0b000001
+            Shadowed = 1
         }
 
         public PackedLight(VisibleLight light, byte shadowIndex) {
             position = light.localToWorldMatrix.GetPosition();
             
             type2_flags6 = (byte) ((byte) GetLightType(light) | (byte) GetLightFlags(light) << 2);
-            range = Mathf.FloatToHalf(light.range);
+            range = half(light.range);
             this.shadowIndex = shadowIndex;
+
+            var rawColor = light.finalColor;
+            color = half3(float3(rawColor.r, rawColor.g, rawColor.b));
+
+            cosAngle = half(Mathf.Cos(Mathf.Deg2Rad * light.spotAngle * 0.5f));
             
-            colorR = Mathf.FloatToHalf(light.finalColor.r);
-            colorG = Mathf.FloatToHalf(light.finalColor.g);
-            colorB = Mathf.FloatToHalf(light.finalColor.b);
-            
-            cosAngle = Mathf.FloatToHalf(Mathf.Cos(Mathf.Deg2Rad * light.spotAngle * 0.5f));
-            
-            Vector3 dir = -light.localToWorldMatrix.GetColumn(2);
-            dirX = Mathf.FloatToHalf(dir.x);
-            dirY = Mathf.FloatToHalf(dir.y);
-            dirZ = Mathf.FloatToHalf(dir.z);
-            shadowStrength = Mathf.FloatToHalf(light.light.shadowStrength);
+            dir = half3((Vector3) (-light.localToWorldMatrix.GetColumn(2)));
+            shadowStrength = half(light.light.shadowStrength);
         }
 
         private static PackedLightFlags GetLightFlags(VisibleLight light) {
-            PackedLightFlags flags = PackedLightFlags.None;
+            var flags = PackedLightFlags.None;
             if (light.light.shadows != LightShadows.None && light.light.shadowStrength > 0)
                 flags |= PackedLightFlags.Shadowed;
             return flags;

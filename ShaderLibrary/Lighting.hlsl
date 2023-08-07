@@ -4,11 +4,7 @@
 #include "Common.hlsl"
 #include "Light.hlsl"
 #include "Filtering.hlsl"
-#include "Culling.hlsl"
 #include "Shadows.hlsl"
-
-
-ByteAddressBuffer LightCullingResults;
 
 float3 GetViewDir(float3 positionWS) {
     return ORTHOGRAPHIC_CAMERA ?
@@ -83,8 +79,8 @@ LightingData GetLighting(Light light, const float3 surfaceNormal, const Position
             lighting.lightDir = light.Direction();
             lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
             lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.05, noiseCoords), 8);
-            /*if (HasFlag(light.Flags(), F_LIGHT_SHADOWED))
-                lighting.attenuation *= GetDirectionalShadowAttenuation(positionInputs.positionWS, light.ShadowStrength());*/
+            //if (HasFlag(light.Flags(), F_LIGHT_SHADOWED))
+                lighting.attenuation *= GetDirectionalShadowAttenuation(positionInputs.positionWS, 1/*light.ShadowStrength()*/);
             break;
         case POINT_LIGHT:
             // todo: light dir stuff?

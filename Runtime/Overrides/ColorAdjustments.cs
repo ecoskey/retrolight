@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Overrides {
-    [Serializable, VolumeComponentMenuForRenderPipeline("PostProcessing/Color Adjustments", typeof(Retrolight))]
+    [Serializable, VolumeComponentMenu("PostProcessing/Color Adjustments"), SupportedOnRenderPipeline(typeof(RetrolightAsset))]
     public class ColorAdjustments : VolumeComponent {
         [Header("Color Adjustments")]
         public FloatParameter postExposure = new FloatParameter(0);

@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Overrides {
-    [Serializable, VolumeComponentMenuForRenderPipeline("PostProcessing/Split Toning", typeof(Retrolight))]
+    [Serializable, VolumeComponentMenu("PostProcessing/Split Toning"), SupportedOnRenderPipeline(typeof(RetrolightAsset))]
     public class SplitToning : VolumeComponent {
         [Header("SplitToning")] 
         public ColorParameter shadows = new ColorParameter(Color.white, false, false, true);

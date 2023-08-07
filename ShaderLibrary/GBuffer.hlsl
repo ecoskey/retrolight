@@ -7,7 +7,7 @@
 TEXTURE2D(DiffuseTex); // stores diffuse color & roughness
 TEXTURE2D(SpecularTex); // stores specular color & effect edge strength
 //TEXTURE2D(EmissionTex); // stores emission from emissive materials
-TEXTURE2D(NormalTex);
+TEXTURE2D(NormalTex); // stores world space normals and alpha (to separate background from foreground)
 TEXTURE2D(DepthTex);
 
 float4 SampleDiffuse(const float2 uv) {

@@ -4,34 +4,29 @@ using UnityEngine.Rendering.RendererUtils;
 using Data;
 
 namespace Passes {
-    public class DecalPass : RenderPass<DecalPass.DecalPassData> {
+    public class DecalPass : RenderPass {
         public class DecalPassData {
             public RendererListHandle DecalRendererList;
         }
 
-        public DecalPass(Retrolight pipeline) : base(pipeline) { }
-
-        protected override string PassName => "Decal Pass";
-
         public void Run(GBuffer gBuffer) {
-            using var builder = CreatePass(out var passData);
+            using var builder = AddRenderPass<DecalPassData>("Decal Pass", out var passData, Render);
 
-            gBuffer.ReadAll(builder);
-            builder.UseColorBuffer(gBuffer.Diffuse, 0);
-            builder.UseDepthBuffer(gBuffer.Depth, DepthAccess.Read);
-            builder.UseColorBuffer(gBuffer.Normal, 1);
-            builder.UseColorBuffer(gBuffer.Specular, 2);
+            //todo: set MRT targets
+            //gBuffer.UseAllFrameBuffer(builder, IBaseRenderGraphBuilder.AccessFlags.ReadWrite);
 
             var decalRendererDesc = new RendererListDesc(Constants.DecalPassId, cull, camera) {
                 sortingCriteria = SortingCriteria.CommonOpaque,
                 renderQueueRange = RenderQueueRange.opaque
             };
-            var decalRendererHandle = renderGraph.CreateRendererList(decalRendererDesc);
-            passData.DecalRendererList = builder.UseRendererList(decalRendererHandle);
+            passData.DecalRendererList = renderGraph.CreateRendererList(decalRendererDesc);
+            builder.UseRendererList(passData.DecalRendererList);
         }
 
-        protected override void Render(DecalPassData passData, RenderGraphContext ctx) {
+        private static void Render(DecalPassData passData, RenderGraphContext ctx) {
             ctx.cmd.DrawRendererList(passData.DecalRendererList);
         }
+
+        public DecalPass(Retrolight retrolight) : base(retrolight) { }
     }
 }

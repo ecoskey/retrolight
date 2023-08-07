@@ -1,5 +1,7 @@
 using System;
+using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Data { 
     [RequireComponent(typeof(Camera))]
@@ -7,14 +9,14 @@ namespace Data {
     public class RetrolightCameraData : MonoBehaviour {
         [SerializeField] private bool renderLighting = true;
         [SerializeField] private bool renderShadows = true;
-        [SerializeField] private bool enablePostFX = true;
+        [SerializeField] private bool usePostFX = true;
 
         public bool RenderLighting => renderLighting;
         public bool RenderShadows => renderShadows;
-        public bool EnablePostFx => enablePostFX;
+        public bool UsePostFX => usePostFX;
 
-        public Vector3 PreviousPosition { get; private set; }
-        public Quaternion PreviousRotation { get; private set; }
+        public float3 PreviousPosition { get; private set; }
+        public quaternion PreviousRotation { get; private set; }
 
         private void Awake() {
             var tf = transform;

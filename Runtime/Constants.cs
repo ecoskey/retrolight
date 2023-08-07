@@ -2,9 +2,10 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 public static class Constants {
-    public const int 
+    public const int
         MaximumLights = 1024,
         MaxDirectionalShadows = 16,
+        MaxDirectionalCascades = 4,
         MaxOtherShadows = 64;
 
     public const int
@@ -13,10 +14,11 @@ public static class Constants {
 
     public const int UIntBitSize = 32;
 
-    public static readonly ShaderTagId 
+    public static readonly ShaderTagId
         GBufferPassId = new ShaderTagId("RetrolightGBuffer"),
         DecalPassId = new ShaderTagId("RetrolightDecal"),
-        TransparentPassId = new ShaderTagId("RetrolightTransparent");
+        ForwardOpaquePassId = new ShaderTagId("RetrolightForwardOpaque"),
+        ForwardTransparentPassId = new ShaderTagId("RetrolightForwardTransparent");
 
     public static readonly int
         ViewportParamsId = Shader.PropertyToID("ViewportParams"),

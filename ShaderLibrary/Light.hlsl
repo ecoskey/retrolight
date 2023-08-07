@@ -9,9 +9,6 @@
 
 #define F_LIGHT_SHADOWED 1
 
-#define MAX_LIGHTS 1024
-#define LIGHT_TILE_BUCKET_COUNT TILE_BUCKET_COUNT(MAX_LIGHTS)
-
 //todo: look into utilities in Core RP lib Packing.hlsl
 //todo: make sure this packs correctly
 struct Light {
@@ -24,7 +21,7 @@ struct Light {
         half3 direction;
         half shadowStrength;
     #else
-        uint2 color48_cosAngle16; //packed half3 color and half precision cosine of spotlight angle
+        uint2 color48_cosAngle16; //packed half3 color and half precision cosine of stlight angle
         uint2 direction48_shadowStrength16; //packed half3 direction and half precision normalized strength of shadow
     #endif
 
@@ -84,8 +81,5 @@ struct Light {
         #endif
     }
 };
-
-uint LightCount; //todo: actually set from CPU
-StructuredBuffer<Light> Lights;
 
 #endif

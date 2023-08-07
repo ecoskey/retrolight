@@ -1,18 +1,17 @@
 using Data;
+using Unity.Mathematics;
+using static Unity.Mathematics.math;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using Util;
 
 namespace Passes {
-    public class PostFxPass : RenderPass<PostFxPass.PostFxPassData> {
-        private readonly ComputeShader bloomShader;
-        private readonly ComputeShader colorCorrectionShader;
-
-        private int downsampleFirstK, downsampleK, upsampleK;
-        private int colorCorrectionK;
-
-        public class PostFxPassData {
+    public class PostFxPasses : RenderPass {
+        private readonly int downsampleFirstK, downsampleK, upsampleK;
+        private readonly int colorCorrectionK;
+        
+        private class PostFxPassData {
             public TextureHandle FinalColorTex;
             public BloomData BloomData;
             public TextureHandle[] BloomPyramid;
@@ -32,24 +31,23 @@ namespace Passes {
             sourceParamsId = Shader.PropertyToID("SourceParams"),
             targetSizeId = Shader.PropertyToID("TargetRes");
 
-        public PostFxPass(Retrolight pipeline) : base(pipeline) {
-            bloomShader = shaderBundle.BloomShader;
-            colorCorrectionShader = shaderBundle.ColorCorrectionShader;
-
+        public PostFxPasses(Retrolight pipeline) : base(pipeline) {
+            var bloomShader = ShaderBundle.Instance.BloomShader;
             downsampleFirstK = bloomShader.FindKernel("DownsampleFirst");
             downsampleK = bloomShader.FindKernel("Downsample");
             upsampleK = bloomShader.FindKernel("Upsample");
-            colorCorrectionK = colorCorrectionShader.FindKernel("ColorCorrection");
+            colorCorrectionK = ShaderBundle.Instance.ColorCorrectionShader.FindKernel("ColorCorrection");
         }
 
-
-        protected override string PassName => "Post Processing Pass";
-
         public void Run(TextureHandle finalColorTex) {
-            using var builder = CreatePass(out var passData);
+            using var builder = AddRenderPass<PostFxPassData>("Post Processing Pass", out var passData, Render);
+            /*using var builder = renderGraph.AddRenderPass(
+                "Post Processing Pass", out PostFxPassData passData,
+                new ProfilingSampler("PostFxPass")
+            );*/
             passData.FinalColorTex = builder.ReadWriteTexture(finalColorTex);
             var stack = VolumeManager.instance.stack;
-
+            
             RunBloom(
                 builder, passData, 
                 new BloomData(stack.GetComponent<Overrides.Bloom>(), useHDR, viewportParams.PixelCount)
@@ -64,16 +62,16 @@ namespace Passes {
             public readonly Overrides.Bloom.BloomMode Mode;
             public readonly bool HighQuality;
             public readonly float Intensity;
-            public readonly Vector4 ThresholdParams;
+            public readonly float4 ThresholdParams;
             public readonly int Iterations;
 
-            public BloomData(Overrides.Bloom bloom, bool hdr, Vector2Int rtScaledSize) {
+            public BloomData(Overrides.Bloom bloom, bool hdr, int2 rtScaledSize) {
                 Mode = hdr ? bloom.mode.value : Overrides.Bloom.BloomMode.Additive;
                 HighQuality = bloom.highQuality.value;
                 Intensity = bloom.intensity.value;
                 var threshold = bloom.threshold.value;
                 var thresholdKnee = threshold * bloom.knee.value;
-                ThresholdParams = new Vector4(
+                ThresholdParams = float4(
                     threshold, -threshold + thresholdKnee,
                     2 * thresholdKnee, 1f / (4 * thresholdKnee + 1e-5f)
                 );
@@ -96,7 +94,7 @@ namespace Passes {
             PostFxPassData passData,
             BloomData bloomData
         ) {
-            var bloomTexDesc = TextureUtil.ColorTex();
+            var bloomTexDesc = TextureUtils.ColorTex();
             bloomTexDesc.enableRandomWrite = true;
             passData.BloomPyramid = new TextureHandle[bloomData.Iterations];
             for (int i = 0; i < bloomData.Iterations; i++) {
@@ -106,17 +104,16 @@ namespace Passes {
             }
         }
 
-        protected override void Render(PostFxPassData passData, RenderGraphContext ctx) {
+        private void Render(PostFxPassData passData, RenderGraphContext ctx) {
             #if UNITY_EDITOR
             CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, passData.PreGizmosRenderer);
             #endif
-            if (passData.BloomData is {Iterations: > 0, Intensity: > 0}) RenderBloom(passData, ctx);
+            if (passData.BloomData is { Iterations: > 0, Intensity: > 0 }) RenderBloom(passData, ctx);
             #if UNITY_EDITOR
             CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, passData.PostGizmosRenderer);
             #endif
         }
-
-
+        
         private void RenderBloom(PostFxPassData passData, RenderGraphContext ctx) {
             var bloom = passData.BloomData;
             BloomPass(bloom, ctx.cmd, passData.FinalColorTex, passData.BloomPyramid[0], downsampleFirstK);
@@ -127,31 +124,36 @@ namespace Passes {
             BloomPass(bloom, ctx.cmd, passData.BloomPyramid[0], passData.FinalColorTex, upsampleK);
         }
 
-        private void BloomPass(BloomData bloomData, CommandBuffer cmd, RTHandle source, RTHandle target, int kernel) {
-            Vector4 sourceParams;
-            Vector2 rtHandleScale = RTHandles.rtHandleProperties.rtHandleScale;
-            Vector2 scaleFactor = source.scaleFactor;
+        private static void BloomPass(
+            BloomData bloomData, CommandBuffer cmd, 
+            RTHandle source, RTHandle target, int kernel
+        ) {
+            var bloomShader = ShaderBundle.Instance.BloomShader;
+            
+            float4 sourceParams;
+            float2 rtHandleScale = float4(RTHandles.rtHandleProperties.rtHandleScale).xy;
+            float2 scaleFactor = float2(source.scaleFactor);
             sourceParams.x = rtHandleScale.x * scaleFactor.x;
             sourceParams.y = rtHandleScale.y * scaleFactor.y;
-            Vector2Int scaledSize = source.GetScaledSize();
+            int2 scaledSize = source.GetScaledSize().AsVector();
             sourceParams.z = 1f / scaledSize.x;
             sourceParams.w = 1f / scaledSize.y;
 
-            Vector2Int targetSize = target.GetScaledSize();
+            int2 targetSize = target.GetScaledSize().AsVector();
 
             cmd.SetComputeVectorParam(bloomShader, thresholdParamsId, bloomData.ThresholdParams);
             cmd.SetComputeFloatParam(bloomShader, intensityId, bloomData.Intensity);
             cmd.SetComputeVectorParam(bloomShader, sourceParamsId, sourceParams);
             cmd.SetComputeVectorParam(
                 bloomShader, targetSizeId, 
-                new Vector4(targetSize.x, targetSize.y, 1f / targetSize.x, 1f / targetSize.y)
+                new float4(targetSize, 1f / float2(targetSize))
             );
             cmd.SetComputeTextureParam(bloomShader, kernel, sourceId, source);
             cmd.SetComputeTextureParam(bloomShader, kernel, targetId, target);
             cmd.DispatchCompute(
                 bloomShader, kernel, 
-                MathUtil.NextMultipleOf(targetSize.x, Constants.SmallTile), 
-                MathUtil.NextMultipleOf(targetSize.y, Constants.SmallTile), 1
+                MathUtils.NextMultipleOf(targetSize.x, Constants.MediumTile), 
+                MathUtils.NextMultipleOf(targetSize.y, Constants.MediumTile), 1
             );
         }
 

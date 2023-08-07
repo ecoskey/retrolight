@@ -1,25 +1,28 @@
 using System.Runtime.InteropServices;
-using UnityEngine;
+using Unity.Mathematics;
+using static Unity.Mathematics.math;
 using UnityEngine.Rendering;
 using Util;
+using int2 = Unity.Mathematics.int2;
 
 namespace Data {
     [StructLayout(LayoutKind.Sequential)]
     public struct ViewportParams {
-        public readonly Vector4 Resolution; // .xy is resolution, .zw is reciprocal resolution
-        public readonly Vector2Int PixelCount;
-        public readonly Vector2Int TileCount;
-        public readonly Vector2 ViewportScale;
+        public readonly float4 Resolution; // .xy is resolution, .zw is reciprocal resolution
+        public readonly int2 PixelCount;
+        public readonly int2 TileCount;
+        public readonly float2 ViewportScale;
 
         public ViewportParams(RTHandleProperties rtHandleProperties) {
-            PixelCount = rtHandleProperties.currentViewportSize;
-            Resolution = new Vector4(PixelCount.x, PixelCount.y, 1f / PixelCount.x, 1f / PixelCount.y);
-            TileCount = new Vector2Int(
-                MathUtil.NextMultipleOf(PixelCount.x, Constants.MediumTile), 
-                MathUtil.NextMultipleOf(PixelCount.y, Constants.MediumTile)
+            var rawPixels = rtHandleProperties.currentViewportSize;
+            PixelCount = int2(rawPixels.x, rawPixels.y);
+            Resolution = float4(PixelCount.x, PixelCount.y, 1f / PixelCount.x, 1f / PixelCount.y);
+            TileCount = int2(
+                MathUtils.NextMultipleOf(PixelCount.x, Constants.MediumTile), 
+                MathUtils.NextMultipleOf(PixelCount.y, Constants.MediumTile)
             );
             var scale = rtHandleProperties.rtHandleScale;
-            ViewportScale = new Vector2(scale.x, scale.y);
+            ViewportScale = float2(scale.x, scale.y);
         }
     }
 }

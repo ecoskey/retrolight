@@ -1,21 +1,27 @@
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
+using static Passes.RenderPass;
 
 namespace Passes {
-    public class FinalPass : RenderPass<FinalPass.FinalPassData> {
-        public class FinalPassData {
+    public class FinalPass : RenderPass { //todo: still using legacy thingamabopper, 
+        private class FinalPassData {
             public TextureHandle FinalColorTex;
             public TextureHandle CameraTarget;
-            public Vector2 ViewportShift;
+            public float2 ViewportShift;
         }
+        
+        public FinalPass(Retrolight retrolight) : base(retrolight) { }
 
-        public FinalPass(Retrolight pipeline) : base(pipeline) { }
-
-        protected override string PassName => "Final Pass";
-
-        public void Run(TextureHandle finalColor, Vector2 viewportShift) {
-            using var builder = CreatePass(out var passData);
+        public void Run(TextureHandle finalColor, float2 viewportShift) {
+            //using var builder = CreatePass<FinalPassData>("Final Pass", out var passData, Render);
+            using var builder = renderGraph.AddRenderPass(
+                "Final Pass", out FinalPassData passData,
+                new ProfilingSampler("Final Pass Sampler")
+            );
+            
+            builder.SetRenderFunc<FinalPassData>(Render);
 
             passData.FinalColorTex = builder.ReadTexture(finalColor);
             TextureHandle cameraTarget = renderGraph.ImportBackbuffer(BuiltinRenderTextureType.CameraTarget);
@@ -23,11 +29,12 @@ namespace Passes {
             passData.ViewportShift = viewportShift;
         }
 
-        protected override void Render(FinalPassData passData, RenderGraphContext ctx) {
+        private static void Render(FinalPassData passData, RenderGraphContext ctx) {
             Blitter.BlitCameraTexture(
                 ctx.cmd, passData.FinalColorTex, passData.CameraTarget,
                 new Vector4(1, 1, passData.ViewportShift.x, passData.ViewportShift.y), 0, false
             );
         }
+
     }
 }

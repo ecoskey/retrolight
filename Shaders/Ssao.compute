@@ -1,0 +1,58 @@
+#pragma kernel SSAO
+
+#include "../ShaderLibrary/Common.hlsl"
+#include "../ShaderLibrary/Viewport.hlsl"
+#include "../ShaderLibrary/GBuffer.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Random.hlsl"
+
+static const float3 hemisphere[16] = {
+    float3(-0.86, 0.46, 0.08),
+    float3(0.63, 0.21, 0.64),
+    float3(-0.13, -0.12, 0.94),
+    float3(0.44, -0.18, 0.86),
+    float3(-0.01, 0.52, 0.54),
+    float3(0.48, 0.48, 0.14),
+    float3(-0.20, 0.32, 0.92),
+    float3(0.31, 0.62, 0.42),
+    float3(0.64, -0.27, 0.64),
+    float3(-0.54, -0.38, 0.24),
+    float3(-0.02, 0.71, 0.31),
+    float3(0.64, -0.31, 0.17),
+    float3(-0.33, 0.02, 0.86),
+    float3(0.08, -0.07, 0.78),
+    float3(0.03, 0.02, 0.64),
+    float3(-0.52, 0.29, 0.02)
+};
+
+RWTexture2D<float> SsaoTex;
+
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
+void SSAO(uint2 dispatchId : SV_DispatchThreadID) {
+    const float3 normal = LoadNormal(dispatchId);
+    const float rawDepth = LOAD_TEXTURE2D(DepthTex, dispatchId).r + 0.01; //todo: accept bias parameter
+    const float3 posWS = ComputeWorldSpacePosition(float2(dispatchId) * Resolution.zw, rawDepth, UNITY_MATRIX_I_VP);
+    
+    uint seed = JenkinsHash(dispatchId);
+    //maybe normalize first?
+    const float3 randDir = normalize(float3(
+        ConstructFloat(XorShift(seed)) * 2 - 1,
+        ConstructFloat(XorShift(seed)) * 2 - 1,
+        ConstructFloat(XorShift(seed)) * 0.2
+    ));
+    
+    const float3 tangent = normalize(randDir - normal * dot(randDir, normal));
+    const float3 binormal = cross(normal, tangent);
+    const float3x3 toWorldSpace = float3x3(tangent, binormal, normal);
+
+    uint passed = 0;
+    //UNITY_UNROLLX(16)
+    for (int i = 0; i < 16; i++) {
+        const float3 newPosWS = posWS + mul(toWorldSpace, normalize(hemisphere[i])) * 0.2;
+        float4 newPosCS = TransformWorldToHClip(newPosWS);
+        newPosCS.xyz /= newPosCS.w;
+        const float newDepth = SAMPLE_DEPTH_TEXTURE_LOD(DepthTex, POINT_SAMPLER, newPosCS.xy * 0.5 + 0.5, 0).r;
+        passed += COMPARE_DEVICE_DEPTH_CLOSER(rawDepth, newDepth);
+    }
+
+    SsaoTex[dispatchId] = passed / 16.0;
+}

@@ -78,7 +78,7 @@ uint2 NoiseCoords(float3 cameraPos, uint2 screenPos) {
         	color += SAMPLE_TEXTURE2D_LOD(tex, smp, uv + float2(offset, 0.0), lod).rgb * Weights[i]; \
         } \
         return float4(color, 1); \
-    } \
+    }
 
 #define SEPARABLE_FILTER_Y_TEMPLATE(Name, Size, Offsets, Weights) \
     float4 Name##_Y(FILTER_ARGS) { \
@@ -89,7 +89,7 @@ uint2 NoiseCoords(float3 cameraPos, uint2 screenPos) {
             color += SAMPLE_TEXTURE2D_LOD(tex, smp, uv + float2(0.0, offset), lod).rgb * Weights[i]; \
         } \
         return float4(color, 1); \
-    } \
+    }
 
 #define SEPARABLE_FILTER_TEMPLATE(Name, Size, Offsets, Weights) \
     SEPARABLE_FILTER_X_TEMPLATE(Name, Size, Offsets, Weights) \
@@ -115,6 +115,16 @@ static const float boxWeights7[7] = { 0.1428571, 0.1428571, 0.1428571, 0.1428571
 
 SEPARABLE_FILTER_TEMPLATE(Box7, 7, boxOffsets7, boxWeights7)
 
+#define UNIFORM_FILTER_TEMPLATE(Name, Size, Offsets) \
+    float4 Name##(FILTER_ARGS) { \
+        float3 color = 0.0; \
+        UNITY_UNROLLX(Size) \
+        for (int i = 0; i < Size; i++) { \
+            float offset = Offsets[i] * /*2.0 * */texelSize.y; \
+            color += SAMPLE_TEXTURE2D_LOD(tex, smp, uv + float2(0.0, offset), lod).rgb * Weights[i]; \
+        } \
+        return float4(color, 1); \
+    } \
 
 /*static const float tentOffsets3[3] = { -1, 0, 1 };
 static const float tentWeights3[3] = { 0.25, 0.5, 0.25 };

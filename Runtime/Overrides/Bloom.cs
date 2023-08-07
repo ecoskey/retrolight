@@ -3,10 +3,10 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Overrides {
-    [Serializable, VolumeComponentMenuForRenderPipeline("PostProcessing/Bloom", typeof(Retrolight))]
+    [Serializable, VolumeComponentMenu("PostProcessing/Bloom"), SupportedOnRenderPipeline(typeof(RetrolightAsset))]
     public class Bloom : VolumeComponent {
         [Serializable]
-        public enum BloomMode { Additive, Scattering } //todo: does scattering make sense for SDR? should it be a "prefer" style of option?
+        public enum BloomMode : byte { Additive, Scattering }
 
         [Serializable]
         public class BloomModeParameter : VolumeParameter<BloomMode> {

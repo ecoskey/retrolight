@@ -1,23 +1,26 @@
 using UnityEngine;
 
 namespace Data {
-    [CreateAssetMenu(fileName = "Retrolight Shader Bundle", menuName = "Retrolight/Shader Bundle", order = 0)]
     public class ShaderBundle : ScriptableObject {
-        [SerializeField] private ComputeShader lightCullingShader;
-        [SerializeField] private ComputeShader lightingShader;
+        [field: SerializeField] public ComputeShader LightCullingShader { get; private set; }
+        [field: SerializeField] public ComputeShader LightingShader { get; private set; }
+        [field: SerializeField] public Shader BlitShader { get; private set; }
+        [field: SerializeField] public Shader BlitWithDepthShader { get; private set; }
+        [field: SerializeField] public ComputeShader BloomShader { get; private set; }
+        [field: SerializeField] public ComputeShader ColorCorrectionShader { get; private set; }
+        [field: SerializeField] public ComputeShader SsaoShader { get; private set; }
 
-        [SerializeField] private Shader blitShader;
-        [SerializeField] private Shader blitWithDepthShader;
-        [SerializeField] private ComputeShader bloomShader;
-        [SerializeField] private ComputeShader colorCorrectionShader;
+        private static ShaderBundle instance;
+        private static bool initted;
 
-        public ComputeShader LightCullingShader => lightCullingShader;
-        public ComputeShader LightingShader => lightingShader;
-        
-        public Shader BlitShader => blitShader;
-        public Shader BlitWithDepthShader => blitWithDepthShader;
-        
-        public ComputeShader BloomShader => bloomShader;
-        public ComputeShader ColorCorrectionShader => colorCorrectionShader;
+        public static ShaderBundle Instance {
+            get {
+                if (!initted) {
+                    instance =  UnityEngine.Resources.Load<ShaderBundle>("Retrolight/Shader Bundle");
+                    initted = true;
+                }
+                return instance;
+            }
+        }
     }
 }

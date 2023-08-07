@@ -1,7 +1,10 @@
 using System;
+using Data;
+using Unity.Mathematics;
+using static Unity.Mathematics.math;
 
 namespace Util {
-    public static class MathUtil {
+    public static class MathUtils {
         /*public static int NextMultipleOf(int n, int factor) {
             if (n <= 0) return 1;
             if (n % factor == 0) return n;

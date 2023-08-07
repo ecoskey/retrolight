@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Overrides {
-    [Serializable, VolumeComponentMenuForRenderPipeline("PostProcessing/White Balance", typeof(Retrolight))]
+    [Serializable, VolumeComponentMenu("PostProcessing/White Balance"), SupportedOnRenderPipeline(typeof(RetrolightAsset))]
     public class WhiteBalance : VolumeComponent {
         [Header("White Balance")] 
         public ClampedFloatParameter temperature = new ClampedFloatParameter(0, -100, 100);
