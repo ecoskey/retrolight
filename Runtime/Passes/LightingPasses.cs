@@ -140,7 +140,7 @@ namespace Passes {
                                 );
                                 shadowSplits[directionalShadowSplits++ + otherShadowSplits] = shadowSplitData;
 
-                                shadowedDirectionalLights.Add(new ShadowedLight(i, matrixV, matrixP));
+                                shadowedDirectionalLights.Add(new ShadowedLight(i, matrixV, matrixP, shadowSplitData));
                             }
                             break;
                         case LightType.Spot: break;
@@ -172,7 +172,7 @@ namespace Passes {
             passData.Lights.Dispose();
             ctx.cmd.SetGlobalBuffer(Constants.LightBufferId, passData.AllocatedLights.LightsBuffer);
             
-            ctx.renderContext.CullShadowCasters(cull, passData.CullingInfos);
+            //ctx.renderContext.CullShadowCasters(cull, passData.CullingInfos);
         }
         
         public ShadowData RunShadows(AllocatedLights allocatedLights) {
@@ -208,6 +208,7 @@ namespace Passes {
             for (int i = 0; i < passData.AllocatedLights.ShadowedDirectionalLights.Count; i++) {
                 var shadowedDirLight = passData.AllocatedLights.ShadowedDirectionalLights[i];
                 var shadowDrawingSettings = new ShadowDrawingSettings(cull, shadowedDirLight.VisibleLightIndex);
+                shadowDrawingSettings.splitData = shadowedDirLight.SplitData;
                 var shadowRenderer = renderGraph.CreateShadowRendererList(ref shadowDrawingSettings);
                 //todo: optimize? it seems like renderer lists are duplicated across cascades
                 builder.UseRendererList(shadowRenderer);
