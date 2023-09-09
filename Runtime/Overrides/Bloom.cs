@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Overrides {
+namespace Retrolight.Overrides {
     [Serializable, VolumeComponentMenu("PostProcessing/Bloom"), SupportedOnRenderPipeline(typeof(RetrolightAsset))]
     public class Bloom : VolumeComponent {
         [Serializable]

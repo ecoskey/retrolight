@@ -1,16 +1,16 @@
+using Retrolight.Data;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
-using Data;
 
-namespace Passes {
+namespace Retrolight.Passes {
     public class DecalPass : RenderPass {
         public class DecalPassData {
             public RendererListHandle DecalRendererList;
         }
 
         public void Run(GBuffer gBuffer) {
-            using var builder = AddRenderPass<DecalPassData>("Decal Pass", out var passData, Render);
+            using var builder = AddRenderPass<DecalPassData>("Decal Pass", Render, out var passData);
 
             //todo: set MRT targets
             //gBuffer.UseAllFrameBuffer(builder, IBaseRenderGraphBuilder.AccessFlags.ReadWrite);

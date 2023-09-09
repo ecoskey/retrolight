@@ -12,17 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2bba273bac5e41b3b1c0cf82399797dd, type: 3}
   m_Name: Shader Bundle
   m_EditorClassIdentifier: 
+  <GTAOShader>k__BackingField: {fileID: 7200000, guid: dcae902bec0a48c4b24fdf1fa487d27b,
+    type: 3}
   <LightCullingShader>k__BackingField: {fileID: 7200000, guid: 86dded576698b4c2c9296bf77056e8b1,
     type: 3}
   <LightingShader>k__BackingField: {fileID: 7200000, guid: 46146151f79441d79b24c0d69438b288,
-    type: 3}
-  <BlitShader>k__BackingField: {fileID: 4800000, guid: 1f3a2c4a65254c7e87fce0ea2d2dde48,
-    type: 3}
-  <BlitWithDepthShader>k__BackingField: {fileID: 4800000, guid: 1fdb84711ca540ce8230532fa1ccb19e,
     type: 3}
   <BloomShader>k__BackingField: {fileID: 7200000, guid: 1b7256d60c574ffab767e3148deb51dd,
     type: 3}
   <ColorCorrectionShader>k__BackingField: {fileID: 7200000, guid: bf9160d4dfc641f79b986d642076bb42,
     type: 3}
-  <SsaoShader>k__BackingField: {fileID: 7200000, guid: b50ee9e5bcfe481883e4f674f2dbb13c,
+  <CompositingShader>k__BackingField: {fileID: 0}
+  <BlitShader>k__BackingField: {fileID: 4800000, guid: 1f3a2c4a65254c7e87fce0ea2d2dde48,
+    type: 3}
+  <BlitWithDepthShader>k__BackingField: {fileID: 4800000, guid: 1fdb84711ca540ce8230532fa1ccb19e,
+    type: 3}
+  <UpscaleShader>k__BackingField: {fileID: 4800000, guid: 67d1c0de90ec4ccb81073f8b6c83655b,
+    type: 3}
+  <HilbertShader>k__BackingField: {fileID: 7200000, guid: d2475faeb08b41a8937f89add9537a3e,
     type: 3}

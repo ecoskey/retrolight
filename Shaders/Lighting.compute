@@ -1,65 +1,76 @@
 #pragma kernel Lighting
 
-#include "../ShaderLibrary/Common.hlsl"
-#include "../ShaderLibrary/GBuffer.hlsl"
-#include "../ShaderLibrary/Light.hlsl"
-#include "../ShaderLibrary/Lighting.hlsl"
-#include "../ShaderLibrary/Viewport.hlsl"
-#include "../ShaderLibrary/Culling.hlsl"
-#include "../ShaderLibrary/Edges.hlsl"
+#pragma multi_compile _ SHADOWS_ENABLED
+#pragma multi_compile _ SSAO_ENABLED
 
-RW_TEXTURE2D(float4, FinalColorTex);
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Common.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/GBuffer.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Light.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Lighting.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Viewport.hlsl"
+#include"Packages/net.cosc.retrolight/ShaderLibrary/Culling.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Edges.hlsl"
+//#include "Packages/net.cosc.retrolight/ShaderLibrary/HilbertInput.hlsl"
 
-struct ThreadInfo {
-    uint2 id : SV_GroupID;
-    uint index : SV_GroupIndex;
-    uint2 dispatchId : SV_DispatchThreadID;
-    uint2 subId : SV_GroupThreadID;
-};
+#define THREADING_BLOCK_SIZE (TILE_SIZE * TILE_SIZE)
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Threading.hlsl"
 
-Surface GetSurfaceGBuffer(PositionInputs inputs) {
+
+//TEXTURE2D(GTAOTex);
+
+RW_TEXTURE2D(float3, FinalColorTex);
+
+Surface GetSurfaceGBuffer(uint2 positionSS) {
     Surface surface;
-    const float4 diffuseRoughness = LoadDiffuse(inputs.positionSS);
-    const float4 specularEdges = LoadSpecular(inputs.positionSS);
-    const float3 normal = LoadNormal(inputs.positionSS);
+    const float4 diffuseRoughness = LoadDiffuse(positionSS);
+    const float4 specularEdges = LoadSpecular(positionSS);
+    const float3 normal = LoadNormal(positionSS);
     surface.baseDiffuse = diffuseRoughness.rgb;
     surface.alpha = 1;
     surface.roughness = diffuseRoughness.a;
     surface.baseSpecular = specularEdges.rgb;
     surface.edgeStrength = specularEdges.a;
-    surface.normal = normal;
+    surface.normalVS = normal;
     return surface;
 }
 
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
-void Lighting(ThreadInfo input) {
-    if (IsPixelOOB(input.dispatchId)) return;
-    const uint globalTileOffset = TileIndex(input.id) * LIGHT_TILE_BUCKET_COUNT;
-    const PositionInputs positionInputs = GetPositionInput(
-        input.dispatchId, Resolution.zw,
-        LOAD_TEXTURE2D(DepthTex, input.dispatchId).r,
-        UNITY_MATRIX_I_VP, UNITY_MATRIX_V, input.id
-    );
+void Lighting(Threading::Group group) {
+    if (IsPixelOOB(group.dispatchID.xy)) return;
+    const float depth = LOAD_TEXTURE2D(DepthTex, group.dispatchID.xy).r;
+    if (depth == UNITY_RAW_FAR_CLIP_VALUE) {
+        FinalColorTex[group.dispatchID.xy] = LOAD_TEXTURE2D(FinalColorTex, group.dispatchID.xy).rgb;
+        return;
+    }
+
+    //const uint hilbertIndex = Filtering::ComputeHilbertIndex(64, group.dispatchID.x, group.dispatchID.y);
     
-    const Surface surface = GetSurfaceGBuffer(positionInputs);
+    //check if groupID
+    const uint globalTileOffset = TileIndex(group.groupID.xy) * LIGHT_TILE_BUCKET_COUNT;
+    float3 positionVS = ViewSpaceFromDepthCompute(group.dispatchID.xy, Resolution.zw);
+    //positionVS.z = - positionVS.z;
+    float3 viewDirVS = GetViewDirVS(positionVS);
+
+    Surface surface = GetSurfaceGBuffer(group.dispatchID.xy);
     
     float3 accLight = 0.025 * surface.baseDiffuse;
-    
     UNITY_LOOP
     for (uint i = 0; i * BUCKET_SIZE < LightCount; i++) {
-        FinalColorTex[input.dispatchId] = 1;
         const uint lightsOffset = i * BUCKET_SIZE;
         uint bucket = LightCullingResults.Load(globalTileOffset + i);
         while (bucket != 0) {
             const uint firstLightIndex = firstbitlow(bucket);
             ClearBit(bucket, firstLightIndex);
-            const Light light = Lights[lightsOffset + firstLightIndex];
-            const LightingData lighting = GetLighting(light, surface.normal, positionInputs);
-            accLight += DirectBRDF(surface, lighting, GetViewDir(positionInputs.positionWS));
+            Light light = Lights[lightsOffset + firstLightIndex];
+            const float snormNoise = Filtering::Remap01To11(Filtering::Bayer4(group.dispatchID.xy));
+            const LightingData lighting = GetLighting(light, surface.normalVS, positionVS, snormNoise, surface.roughness * 0.005);
+            accLight += DirectBRDF(surface, lighting, viewDirVS);
         }
     }
-    /*const float2 edges = GetEdgeStrength(positionInputs.positionSS);
-    const float modifier = edges.y > edges.x ? surface.edgeStrength : -surface.edgeStrength;*/
+    /*const float2 edges = GetEdgeStrength(group.dispatchID.xy);
+    const float edgeStrength = max(edges.x, edges.y) * surface.edgeStrength;
+    const float modifier = edges.y > edges.x ? 1 + edgeStrength : 1 - edgeStrength;*/
     
-    FinalColorTex[input.dispatchId] = float4(accLight/* + modifier*/, 1);
+    
+    FinalColorTex[group.dispatchID.xy] = accLight;
 }

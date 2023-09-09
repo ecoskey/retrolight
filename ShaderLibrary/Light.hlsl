@@ -12,7 +12,7 @@
 //todo: look into utilities in Core RP lib Packing.hlsl
 //todo: make sure this packs correctly
 struct Light {
-    float3 position;
+    float3 positionVS;
     uint type2_flags6_shadowIndex8_range16; //flags are currently unused, possibly layer mask?
 
     #if REAL_IS_HALF

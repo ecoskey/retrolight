@@ -1,7 +1,17 @@
 {
     "name": "Cosc.Retrolight.Editor",
+    "rootNamespace": "Retrolight.Editor",
     "references": [
         "Cosc.Retrolight.Runtime",
         "Unity.RenderPipelines.Core.Editor"
-    ]
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Overrides {
+namespace Retrolight.Overrides {
     [Serializable, VolumeComponentMenu("PostProcessing/Color Adjustments"), SupportedOnRenderPipeline(typeof(RetrolightAsset))]
     public class ColorAdjustments : VolumeComponent {
         [Header("Color Adjustments")]

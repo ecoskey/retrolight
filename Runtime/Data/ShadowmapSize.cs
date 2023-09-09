@@ -1,6 +1,6 @@
 using System;
 
-namespace Data {
+namespace Retrolight.Data {
     [Serializable]
     public enum ShadowmapSize {
         _128 = 128,

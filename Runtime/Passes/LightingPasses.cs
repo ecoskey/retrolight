@@ -1,96 +1,168 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
-using UnityEngine;
-using UnityEngine.Experimental.Rendering.RenderGraphModule;
-using Data;
+using Retrolight.Data;
+using Retrolight.Data.Bundles;
+using Retrolight.Util;
+using Unity.Burst;
 using Unity.Collections;
-using UnityEngine.Rendering;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
+using Unity.Mathematics;
 using static Unity.Mathematics.math;
-using Util;
-using AccessFlags = UnityEngine.Experimental.Rendering.RenderGraphModule.IBaseRenderGraphBuilder.AccessFlags;
+using UnityEngine;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
+using UnityEngine.Rendering;
+using float4x4 = Unity.Mathematics.float4x4;
+using half3 = Unity.Mathematics.half3;
 
 
-namespace Passes {
+namespace Retrolight.Passes {
     public class LightingPasses : RenderPass {
-        private readonly ComputeShader lightingModel;
+        private readonly ComputeShader lightCullingShader, lightingModel;
+        private readonly LocalKeyword debugKeyword;
         private readonly int lightingKernelId, lightCullingKernelId;
+
+        private static GlobalKeyword kEnableShadows = GlobalKeyword.Create("ENABLE_SHADOWS");
+        private static GlobalKeyword kEnableSsao = GlobalKeyword.Create("ENABLE_SSAO");
         
-        public LightingPasses(Retrolight retrolight, ComputeShader customLighting = null) : base(retrolight) {
+        public LightingPasses(Retrolight retrolight) : this(retrolight, Option.None<ComputeShader>()) { } 
+        
+        public LightingPasses(
+            Retrolight retrolight, 
+            Option<ComputeShader> customLighting
+        ) : base(retrolight) {
             // ReSharper disable once MergeConditionalExpression
-            lightingModel = customLighting is null ? ShaderBundle.Instance.LightingShader : customLighting;
+            lightCullingShader = ShaderBundle.Instance.LightCullingShader;
+            debugKeyword = new LocalKeyword(lightCullingShader, "EDITOR_DEBUG");
+            lightingModel = customLighting.OrElse(ShaderBundle.Instance.LightingShader);
             lightingKernelId = lightingModel.FindKernel("Lighting");
             lightCullingKernelId = ShaderBundle.Instance.LightCullingShader.FindKernel("LightCulling");
         }
         
+
+        [BurstCompile(OptimizeFor = OptimizeFor.Performance, FloatMode = FloatMode.Fast)]
+        private struct LightArrayJob : IJobParallelFor {
+            [ReadOnly] public float4x4 viewMatrix;
+            [ReadOnly] public NativeArray<VisibleLight> VisibleLights;
+            public NativeArray<PackedLight> PackedLights;
+
+            //intended to be used with NativeArray.Reinterpret on a VisibleLight
+            /*[StructLayout(LayoutKind.Sequential)]
+            public struct RawVisibleLight {
+                public LightType type;
+                public float4 color;
+                public float4 _packing; //instead of screen space rectangle
+                public float4x4 localToWorld;
+                public float range;
+                public float spotAngle;
+                public int instanceID;
+                private int _packing2; // instead of internal flags enum
+            }*/
+
+            private static PackedLight.Flags GetLightFlags(VisibleLight light) {
+                var flags = PackedLight.Flags.None;
+                /*if (light.light.shadows != LightShadows.None && light.light.shadowStrength > 0)
+                    flags |= PackedLightFlags.Shadowed;*/
+                return flags;
+            }
+
+            private static PackedLight.Type GetLightType(VisibleLight light) => light.lightType switch {
+                LightType.Directional => PackedLight.Type.Directional,
+                LightType.Point => PackedLight.Type.Point,
+                LightType.Spot => PackedLight.Type.Spot,
+                _ => PackedLight.Type.Spot //todo: support area lights in future
+            };
+
+            public void Execute(int index) {
+                var vLight = VisibleLights[index];
+                var lightTransformRaw = vLight.localToWorldMatrix;
+                float4x4 lightTransform = UnsafeUtility.As<Matrix4x4, float4x4>(ref lightTransformRaw);
+                float3 positionWS = lightTransform.c3.xyz;
+                float4 dirWS = -lightTransform.c2;
+                dirWS.w = 0; //multiply as direction, don't use offset
+                var pLight = new PackedLight {
+                    position = transform(viewMatrix, positionWS),
+                    //position = positionWS,
+                    type2_flags6 = (byte) ((byte) GetLightType(vLight) | (byte) GetLightFlags(vLight) << 2),
+                    range = half(vLight.range),
+                    //this.shadowIndex = shadowIndex;
+                    color = half3(vLight.finalColor.AsVector().xyz),
+                    cosAngle = half(cos(radians(vLight.spotAngle * 0.5f))),
+                    //dir = half3(dirWS.xyz),
+                    dir = half3(mul(viewMatrix, dirWS).xyz),
+                    //shadowStrength = half(light.light.shadowStrength);
+                };
+                //pLight.position.z = -pLight.position.z;
+                
+                PackedLights[index] = pLight;
+            }
+        }
+
         private class LightAllocationPassData {
             public AllocatedLights AllocatedLights;
             public NativeArray<PackedLight> Lights;
-            public ShadowCastersCullingInfos CullingInfos;
+            public JobHandle lightArrayJob;
+            //public ShadowCastersCullingInfos CullingInfos;
         }
 
-        private class LightCullingPassData {
-            public AllocatedLights AllocatedLights;
-            public BufferHandle CullingResultsBuffer;
-        }
-
-        private class LightingPassData {
-            public TextureHandle FinalColorTex;
-            public ShadowData ShadowData;
-        }
-
-        private class ShadowsPassData {
-            public AllocatedLights AllocatedLights;
-            public ShadowData ShadowData;
-            public int DirectionalAtlasSplit;
-            public ShadowmapSize DirectionalSplitSize;
-            public RendererListHandle[] DirectionalShadowRenderers;
-            //public RendererListHandle[] OtherShadowRenderers;
-        }
-        
-        
         public AllocatedLights AllocateLights() {
-            using var builder = AddRenderPass<LightAllocationPassData>(
-                "Light Allocation Pass", out var passData, RenderLightAllocation
+            using var builder = AddRenderPass(
+                "Light Allocation Pass", RenderLightAllocation, 
+                out LightAllocationPassData passData
             );
             
+            //necessary to not run the light array job without completing it
+            builder.AllowPassCulling(false);
             //builder.AllowGlobalStateModification(true); //todo: necessary?
             
-            var lightsBufferDesc = new BufferDesc(Constants.MaximumLights, Marshal.SizeOf<PackedLight>()) {
+            var lightsBufferDesc = new BufferDesc(Constants.MaximumLights, UnsafeUtility.SizeOf<PackedLight>()) {
                 name = Constants.LightBufferName,
                 target = GraphicsBuffer.Target.Structured
             };
             //var lightBuffer = CreateUseBuffer(builder, lightsDesc, AccessFlags.Write);
             var lightBuffer = builder.WriteBuffer(renderGraph.CreateBuffer(lightsBufferDesc));
+
+            //var rawVisibleLights = cull.visibleLights.Reinterpret<LightArrayJob.RawVisibleLight>();
+            //visibleLights.Dispose();
             
             int lightCount = Math.Min(cull.visibleLights.Length, Constants.MaximumLights);
             NativeArray<PackedLight> packedLights = new NativeArray<PackedLight>(
-                lightCount, Allocator.Temp,
+                lightCount, Allocator.TempJob,
                 NativeArrayOptions.UninitializedMemory
             );
             passData.Lights = packedLights;
 
+            //float4x4 viewMatrix = mul(float4x4.Scale(1, 1, -1), camera.worldToCameraMatrix);
+            float4x4 viewMatrix = camera.worldToCameraMatrix;
+            //viewMatrix = mul(float4x4.Scale(1, 1, -1), viewMatrix);
+            //Unity BS to invert Z direction for view matrix, equivalent to above matrix calculation
+            //if (!camera.IsSceneView()) {
+            /*viewMatrix.c0.z = -viewMatrix.c0.z;
+            viewMatrix.c1.z = -viewMatrix.c1.z;
+            viewMatrix.c2.z = -viewMatrix.c2.z;
+            viewMatrix.c3.z = -viewMatrix.c3.z;*/
+            //}
+            
+            var lightArrayJob = new LightArrayJob {
+                VisibleLights = cull.visibleLights,
+                PackedLights = packedLights,
+                viewMatrix = viewMatrix,
+            };
+            
+            passData.lightArrayJob = lightArrayJob.Schedule(lightCount, 32);
+
+            /*
             byte directionalShadowSplits = 0;
             byte otherShadowSplits = 0;
             //visible light indices, not shadow atlas indices
             List<ShadowedLight> shadowedDirectionalLights = new List<ShadowedLight>();
-            
-            //List<int> shadowedOtherLights = new List<int>();
-            
-            //todo: persist over multiple frames to avoid allocation?
-            
-            
-
-            //List<ShadowSplitData> shadowSplits = new List<ShadowSplitData>();
-            //List<LightShadowCasterCullingInfo> lightShadowCasterCullingInfos = new List<LightShadowCasterCullingInfo>();
-            
-            
 
             byte directionalCascades = camera.orthographic ? (byte) 1 : shadowSettings.directionalCascades;
             int maxDirectionalSplits = directionalCascades * shadowSettings.maxDirectionalShadows;
-            int maxOtherSplits = shadowSettings.maxOtherShadows;
+            int maxOtherSplits = shadowSettings.maxOtherShadows;*/
 
+            /*
             NativeArray<ShadowSplitData> shadowSplits = new NativeArray<ShadowSplitData>(
                 maxDirectionalSplits + maxOtherSplits, 
                 Allocator.Temp, NativeArrayOptions.UninitializedMemory
@@ -100,9 +172,11 @@ namespace Passes {
                 new NativeArray<LightShadowCasterCullingInfo>(
                     lightCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory
                 );
+                */
             
-
-            for (int i = 0; i < lightCount; i++) {
+            
+            
+            /*for (int i = 0; i < lightCount; i++) {
                 var vLight = cull.visibleLights[i];
                 var light = vLight.light;
                 byte shadowSplitIndex = 0; //for setting a PackedLight's reference to the shadow matrix
@@ -130,7 +204,7 @@ namespace Passes {
                                 splitRange = new RangeInt(splitIndex, directionalCascades),
                                 projectionType = BatchCullingProjectionType.Orthographic
                             };
-                                
+                            
                             for (byte j = 0; j < directionalCascades; j++) {
                                 cull.ComputeDirectionalShadowMatricesAndCullingPrimitives(
                                     i, j, directionalCascades, new Vector3(0.1f, 0.25f, 0.5f), //todo: configure ratios
@@ -139,23 +213,24 @@ namespace Passes {
                                     out ShadowSplitData shadowSplitData
                                 );
                                 shadowSplits[directionalShadowSplits++ + otherShadowSplits] = shadowSplitData;
-
-                                shadowedDirectionalLights.Add(new ShadowedLight(i, matrixV, matrixP, shadowSplitData));
+                                
+                                shadowedDirectionalLights.Add(new ShadowedLight(i, matrixV, matrixP));
                             }
                             break;
-                        case LightType.Spot: break;
-                        case LightType.Point: break;
+                        /*case LightType.Spot: break;
+                        case LightType.Point: break;#1#
+                        default: break;
                     }
                 }
                 packedLights[i] = new PackedLight(vLight, shadowSplitIndex);
-            }
+            }*/
 
-            passData.CullingInfos = new ShadowCastersCullingInfos {
+            /*passData.CullingInfos = new ShadowCastersCullingInfos {
                 splitBuffer = shadowSplits,
                 perLightInfos = lightShadowCasterCullingInfos
-            };
+            };*/
             
-            var allocatedLights = new AllocatedLights(lightCount, lightBuffer, shadowedDirectionalLights);
+            var allocatedLights = new AllocatedLights(lightCount, lightBuffer/*, shadowedDirectionalLights*/);
             passData.AllocatedLights = allocatedLights;
             
             return allocatedLights;
@@ -165,19 +240,35 @@ namespace Passes {
             var lightCount = passData.AllocatedLights.LightCount;
             ctx.cmd.SetGlobalInteger(Constants.LightCountId, lightCount);
 
+            /*for (int i = 0; i < lightCount; i++) {
+                Debug.Log(passData.Lights[i].position.ToString());
+            }*/
+
+            passData.lightArrayJob.Complete();
             ctx.cmd.SetBufferData(
                 passData.AllocatedLights.LightsBuffer, passData.Lights, 
                 0, 0, lightCount
             );
+            //passData.tempVLights.Dispose();
             passData.Lights.Dispose();
             ctx.cmd.SetGlobalBuffer(Constants.LightBufferId, passData.AllocatedLights.LightsBuffer);
             
-            //ctx.renderContext.CullShadowCasters(cull, passData.CullingInfos);
+            //ctx.renderContext.CullShadowCasters(cull, passData.CullingInfos); //evil
         }
         
-        public ShadowData RunShadows(AllocatedLights allocatedLights) {
-            //if (shadowedLightRenderCount <= 0)) return;
-            using var builder = AddRenderPass<ShadowsPassData>("Shadows Pass", out var passData, RenderShadows);
+        /*private class ShadowsPassData {
+            public AllocatedLights AllocatedLights;
+            public ShadowData ShadowData;
+            public int DirectionalAtlasSplit;
+            public ShadowmapSize DirectionalSplitSize;
+            public RendererListHandle[] DirectionalShadowRenderers;
+            //public RendererListHandle[] OtherShadowRenderers;
+        }*/
+        
+        /*public Option<ShadowData> RunShadows(AllocatedLights allocatedLights) {
+            //todo: make actual check for invalid ShadowData in struct, god I wish we had ADTs
+            if (allocatedLights.ShadowedDirectionalLights.Count <= 0) return Option.None<ShadowData>(); 
+            using var builder = AddRenderPass("Shadows Pass", RenderShadows, out ShadowsPassData passData);
 
             passData.AllocatedLights = allocatedLights;
             
@@ -192,7 +283,7 @@ namespace Passes {
             /*GetAtlasSize(
                 shadowSettings.otherShadowmapSize, _otherSplits, 
                 out var otherAtlasSize, out var otherAtlasSplit
-            );*/
+            );#1#
 
             var directionalAtlasDesc = GetAtlasDesc(directionalAtlasSize);
             //TextureDesc otherAtlasDesc = GetAtlasDesc(otherAtlasSize);
@@ -208,7 +299,6 @@ namespace Passes {
             for (int i = 0; i < passData.AllocatedLights.ShadowedDirectionalLights.Count; i++) {
                 var shadowedDirLight = passData.AllocatedLights.ShadowedDirectionalLights[i];
                 var shadowDrawingSettings = new ShadowDrawingSettings(cull, shadowedDirLight.VisibleLightIndex);
-                shadowDrawingSettings.splitData = shadowedDirLight.SplitData;
                 var shadowRenderer = renderGraph.CreateShadowRendererList(ref shadowDrawingSettings);
                 //todo: optimize? it seems like renderer lists are duplicated across cascades
                 builder.UseRendererList(shadowRenderer);
@@ -225,25 +315,24 @@ namespace Passes {
                 );
             }
             
-            var shadowData = new ShadowData(
+            var shadowData = ShadowData.Create(
                 //todo: again check if this allows for depth testing
                 builder.ReadWriteTexture(renderGraph.CreateTexture(directionalAtlasDesc)),
                 directionalShadowMatrices
             );
             passData.ShadowData = shadowData;
 
-            return shadowData;
+            return Option.Some(shadowData);
         }
-        
-        
+        */
 
-        private void RenderShadows(ShadowsPassData passData, RenderGraphContext ctx) {
+        /*private void RenderShadows(ShadowsPassData passData, RenderGraphContext ctx) {
             //todo: check if this allows for depth testing
             CoreUtils.SetRenderTarget(ctx.cmd, passData.ShadowData.DirectionalShadowAtlas, ClearFlag.Depth);
 
             int numValid = passData.DirectionalShadowRenderers.Count(l => l.IsValid());
             int numShadows = passData.DirectionalShadowRenderers.Length;
-            Debug.Log($"{numValid} of {numShadows} shadow rendererLists are valid");
+            //Debug.Log(string.Format("{0} of {1} shadow rendererLists are valid", numValid.ToString(), numShadows.ToString()));
             
             for (int i = 0; i < passData.DirectionalShadowRenderers.Length; i++) {
                 ctx.cmd.SetViewport(
@@ -268,6 +357,7 @@ namespace Passes {
             );
             //ctx.cmd.SetupCameraProperties(camera);
         }
+        */
         
         private static void GetAtlasSize(
             ShadowmapSize splitSize, int splits, 
@@ -342,25 +432,43 @@ namespace Passes {
             m.m13 = (0.5f * (m.m13 + m.m33) + offset.y * m.m33) * scale;
             return m;
         }
+        
+        private class LightCullingPassData {
+            //public AllocatedLights AllocatedLights;
+            public BufferHandle CullingResultsBuffer;
+            #if UNITY_EDITOR
+            public Option<TextureHandle> CullingDebugTex;
+            #endif
+        }
 
-        public BufferHandle CullLights(GBuffer gbuffer, AllocatedLights allocatedLights) {
-            using var builder = AddRenderPass<LightCullingPassData>(
-                "Light Culling Pass", out var passData, 
-                RenderLightCulling
-            );
+        public BufferHandle CullLights(TextureHandle depthTex, AllocatedLights allocatedLights, bool debug = false) {
+            using var builder = AddRenderPass(
+                "Light Culling Pass", 
+                RenderLightCulling, out LightCullingPassData passData);
             
             //builder.EnableAsyncCompute(true);
             //builder.AllowGlobalStateModification(true);
             //builder.UseTexture(gbuffer.Depth, AccessFlags.Read);
-            builder.ReadTexture(gbuffer.Depth);
+            allocatedLights.ReadAll(builder);
+            builder.ReadTexture(depthTex);
             
             //passData.AllocatedLights = allocatedLights.UseAll(builder, AccessFlags.Read);
+            #if UNITY_EDITOR
+            if (debug) {
+                var debugDesc = TextureUtils.ColorTex(Vector2.one, "Culling Debug Tex");
+                debugDesc.enableRandomWrite = true;
+                passData.CullingDebugTex = Option.Some(builder.CreateTransientTexture(debugDesc));
+            } else {
+                passData.CullingDebugTex = Option.None<TextureHandle>();
+            }
+            #endif
+
+            var cullingResultsSize = 
+                MathUtils.NextMultipleOf(Constants.MaximumLights, Constants.UIntBitSize)
+                * viewportParams.TileCount.x
+                * viewportParams.TileCount.y;
             
-            var cullingResultsDesc = new BufferDesc(
-                MathUtils.NextMultipleOf(Constants.MaximumLights, Constants.UIntBitSize) * 
-                viewportParams.TileCount.x * viewportParams.TileCount.y,
-                sizeof(uint)
-            ) {
+            var cullingResultsDesc = new BufferDesc(cullingResultsSize, sizeof(uint)) {
                 name = Constants.LightCullingResultsBufferName,
                 target = GraphicsBuffer.Target.Raw
             };
@@ -371,66 +479,130 @@ namespace Passes {
         }
 
         private void RenderLightCulling(LightCullingPassData passData, RenderGraphContext ctx) {
-            var lightCullingShader = ShaderBundle.Instance.LightCullingShader;
-            
+            var groups = viewportParams.TileCount;
             ctx.cmd.SetComputeBufferParam(
                 lightCullingShader, lightCullingKernelId, 
                 Constants.LightCullingResultsId, passData.CullingResultsBuffer
             );
+
+            #if UNITY_EDITOR
+            bool debugEnabled = passData.CullingDebugTex.Enabled;
+            ctx.cmd.SetKeyword(lightCullingShader, debugKeyword, debugEnabled);
+            if (debugEnabled) {
+                ctx.cmd.SetComputeTextureParam(
+                    lightCullingShader, lightCullingKernelId, 
+                    "CullingDebugTex", passData.CullingDebugTex.Value
+                );
+            }
+            #endif
             
-            RenderUtils.DispatchCompute(
-                ctx.cmd, lightCullingShader, lightCullingKernelId, 
-                int3(viewportParams.TileCount.xy, 1)
+            ctx.cmd.SetComputeMatrixParam(
+                lightCullingShader, "unity_MatrixInvP",
+             Matrix4x4.Scale(new Vector3(1, 1, -1)) * GL.GetGPUProjectionMatrix(camera.projectionMatrix, true).inverse
+            );
+
+            ctx.cmd.DispatchCompute(
+                lightCullingShader, lightCullingKernelId, 
+                groups.x, groups.y, 1
             );
 
             ctx.cmd.SetGlobalBuffer(Constants.LightCullingResultsId, passData.CullingResultsBuffer);
         }
+        
+        
+        //LIGHTING
+        //--------------------------------------------------------------------------------------------------------------
+
+        private class LightingPassData {
+            public TextureHandle FinalColorTex;
+            public BufferHandle hilbertIndices;
+            public Option<ShadowData> ShadowData;
+            public Option<TextureHandle> Ssao;
+        }
+        
+        public TextureHandle RunLighting(
+            GBuffer gBuffer, TextureHandle depthTex, 
+            AllocatedLights allocatedLights, BufferHandle lightCullingResults//,
+            //BufferHandle hilbertIndices
+        ) => RunLighting(
+            gBuffer, depthTex, allocatedLights, lightCullingResults, 
+            /*hilbertIndices, */Option.None<ShadowData>(), Option.None<TextureHandle>()
+        );
+        
+        public TextureHandle RunLighting(
+            GBuffer gBuffer, TextureHandle depthTex, 
+            AllocatedLights allocatedLights, BufferHandle lightCullingResults,
+            /*BufferHandle hilbertIndices, */ShadowData shadows, TextureHandle ssao
+        ) => RunLighting(
+            gBuffer, depthTex, allocatedLights, lightCullingResults, 
+            /*hilbertIndices, */Option.Some(shadows), Option.Some(ssao)
+        );
 
         public TextureHandle RunLighting(
-            GBuffer gBuffer, AllocatedLights allocatedLights, 
-            BufferHandle lightCullingResults, ShadowData shadows
+            GBuffer gBuffer, TextureHandle depthTex, AllocatedLights allocatedLights, 
+            BufferHandle lightCullingResults, //BufferHandle hilbertIndices,
+            Option<ShadowData> shadows, Option<TextureHandle> ssao
         ) {
-            using var builder = AddRenderPass<LightingPassData>("Lighting Pass", out var passData, RenderLighting);
-
-            passData.ShadowData = shadows.ReadAll(builder);//shadows.UseAll(builder, AccessFlags.Read);
-            gBuffer.ReadAll(builder);//gBuffer.UseAll(builder, AccessFlags.Read);
-            allocatedLights.ReadAll(builder);//allocatedLights.UseAll(builder);
-            builder.ReadBuffer(lightCullingResults);//builder.UseBuffer(lightCullingResults, AccessFlags.Read);
+            using var builder = AddRenderPass("Lighting Pass", RenderLighting, out LightingPassData passData);
+            
+            builder.ReadTexture(depthTex);
+            gBuffer.ReadAll(builder);
+            allocatedLights.ReadAll(builder);
+            builder.ReadBuffer(lightCullingResults);
 
             var finalColorDesc = TextureUtils.ColorTex(
-                float2(1), TextureUtils.PreferHdrFormat(useHDR),
+                Vector2.one, TextureUtils.PreferHdrFormat(useHDR),
                 Constants.FinalColorTexName
             );
             finalColorDesc.enableRandomWrite = true;
-
             passData.FinalColorTex = builder.WriteTexture(renderGraph.CreateTexture(finalColorDesc));//CreateUseTex(builder, finalColorDesc);
+
+            //passData.hilbertIndices = hilbertIndices;
+            passData.ShadowData = shadows.Map(s => s.ReadAll(builder));
+            passData.Ssao = ssao.Map(t => builder.ReadTexture(t));
+            
             return passData.FinalColorTex;
         }
-        
+
         private void RenderLighting(LightingPassData passData, RenderGraphContext ctx) {
-            //var skyboxRenderer = ctx.renderContext.CreateSkyboxRendererList(camera);
-            //CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, skyboxRenderer);
+            var skyboxRenderer = ctx.renderContext.CreateSkyboxRendererList(camera);
+            CoreUtils.DrawRendererList(ctx.renderContext, ctx.cmd, skyboxRenderer);
+            var groups = viewportParams.TileCount;
+
+            //ctx.cmd.SetKeyword(kEnableShadows, passData.ShadowData.Enabled);
+            //ctx.cmd.SetKeyword(kEnableSsao, passData.Ssao.Enabled);
             
-            var groups = int3(viewportParams.TileCount.xy, 1);
             //todo: set global from shadows pass
             //ctx.cmd.SetComputeTextureParam(lightingModel, lightingKernelId, "DirectionalShadowAtlas", passData.ShadowData.DirectionalShadowAtlas);
-            ctx.cmd.SetComputeMatrixArrayParam(lightingModel, "DirectionalShadowMatrices", passData.ShadowData.DirectionalShadowMatrices);
+            //ctx.cmd.SetComputeMatrixArrayParam(lightingModel, "DirectionalShadowMatrices", passData.ShadowData.DirectionalShadowMatrices);
             
-            ctx.cmd.SetComputeMatrixParam(lightingModel, "unity_MatrixV", camera.worldToCameraMatrix);
+            //ctx.cmd.SetComputeBufferParam(lightingModel, lightingKernelId, "HilbertIndices", passData.hilbertIndices);
+            
+            //ctx.cmd.SetComputeMatrixParam(lightingModel, "unity_MatrixV", camera.worldToCameraMatrix);
+
+            //Matrix4x4 invViewMatrix = camera.cameraToWorldMatrix;
+            
+            
             ctx.cmd.SetComputeMatrixParam(
+                lightingModel, "unity_MatrixInvP", 
+                Matrix4x4.Scale(new Vector3(1, 1, -1)) * GL.GetGPUProjectionMatrix(camera.projectionMatrix, true).inverse
+            );
+            
+            /*ctx.cmd.SetComputeMatrixParam(
                 lightingModel, "unity_MatrixInvVP", 
-                (GL.GetGPUProjectionMatrix(camera.projectionMatrix, true) * camera.worldToCameraMatrix).inverse
-            );
-            ctx.cmd.SetComputeVectorParam(
-                lightingModel, "_WorldSpaceCameraPos", camera.transform.position
-            );
+                invViewMatrix * GL.GetGPUProjectionMatrix(camera.projectionMatrix, true).inverse
+            );*/
+            
+            
+            
+            //ctx.cmd.SetComputeVectorParam(lightingModel, "_WorldSpaceCameraPos", camera.transform.position);
             
             ctx.cmd.SetComputeTextureParam(
                 lightingModel, lightingKernelId, 
                 Constants.FinalColorTexId, passData.FinalColorTex
             );
             
-            RenderUtils.DispatchCompute(ctx.cmd, lightingModel, lightingKernelId, groups);
+            ctx.cmd.DispatchCompute(lightingModel, lightingKernelId, groups.x, groups.y, 1);
         }
     }
 }

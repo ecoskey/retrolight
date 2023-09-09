@@ -5,11 +5,16 @@
 #include "Light.hlsl"
 #include "Filtering.hlsl"
 #include "Shadows.hlsl"
+#include "UnityInput.hlsl"
 
 float3 GetViewDir(float3 positionWS) {
-    return ORTHOGRAPHIC_CAMERA ?
+    return IS_ORTHOGRAPHIC_CAMERA ?
         UNITY_MATRIX_I_V[2].xyz :
-        normalize(-GetCameraRelativePositionWS(positionWS));
+        SafeNormalize(_WorldSpaceCameraPos - GetAbsolutePositionWS(positionWS));
+}
+
+float3 GetViewDirVS(float3 positionVS) {
+    return IS_ORTHOGRAPHIC_CAMERA ? float3(0, 0, 1): normalize(-positionVS);
 }
 
 // SURFACE
@@ -18,7 +23,7 @@ struct Surface {
     float3 baseDiffuse;
     float alpha;
     float3 baseSpecular;
-    float3 normal;
+    float3 normalVS;
     float roughness;
     float edgeStrength;
 };
@@ -42,8 +47,8 @@ Surface GetMetallicSurface(
     }
     surface.alpha = alpha;
     surface.baseSpecular = lerp(MIN_REFLECTIVITY, color, metallic);
+    surface.normalVS = normal;
     const float perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(smoothness);
-    surface.normal = normal;
     surface.roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
     surface.edgeStrength = edgeStrength;
     return surface;
@@ -54,7 +59,7 @@ Surface GetMetallicSurface(
 struct LightingData {
     float3 color;
     float attenuation;
-    float3 lightDir;
+    float3 dirVS;
 };
 
 float PointAttenuation(const float d2, const float r, const float f) {
@@ -67,51 +72,55 @@ float SpotAttenuation(const float3 dirToLight, const float3 lightDir, const floa
     return saturate(1.0 - (1.0 - cosAngleToLight) * 1.0/(1.0 - lightCosAngle));
 }
 
-LightingData GetLighting(Light light, const float3 surfaceNormal, const PositionInputs positionInputs) {
+LightingData GetLighting(Light light, const float3 normal, const float3 positionVS, const float snormNoise, const float noiseStrength) {
     LightingData lighting;
 
     lighting.color = light.Color();
-    const uint2 noiseCoords = positionInputs.positionSS;
     float3 relativeLightPos;
     
     switch (light.Type()) {
         case DIRECTIONAL_LIGHT:
-            lighting.lightDir = light.Direction();
-            lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
-            lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.05, noiseCoords), 8);
-            //if (HasFlag(light.Flags(), F_LIGHT_SHADOWED))
-                lighting.attenuation *= GetDirectionalShadowAttenuation(positionInputs.positionWS, 1/*light.ShadowStrength()*/);
+            lighting.dirVS = light.Direction();
+            lighting.attenuation = saturate(dot(normal, lighting.dirVS));
+            //dither with some transfer function? currently dithering is different for different surface angles
+            lighting.attenuation = Filtering::Quantize(lighting.attenuation + snormNoise * noiseStrength, 8, noiseStrength);
+
+            if (HasFlag(light.Flags(), F_LIGHT_SHADOWED))
+                lighting.attenuation *= GetDirectionalShadowAttenuation(
+                    light.ShadowIndex(), positionVS,
+                    light.ShadowStrength()
+                );
             break;
         case POINT_LIGHT:
-            // todo: light dir stuff?
-            relativeLightPos = light.position - positionInputs.positionWS;
-            lighting.lightDir = normalize(relativeLightPos);
-            lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
+            relativeLightPos = light.positionVS - positionVS;
+            lighting.dirVS = normalize(relativeLightPos);
+            lighting.attenuation = saturate(dot(normal, lighting.dirVS));
             lighting.attenuation *= PointAttenuation(Length2(relativeLightPos), light.Range(), 1);
-            lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.1, noiseCoords), 6);
+            lighting.attenuation = Filtering::Quantize(lighting.attenuation + snormNoise * noiseStrength, 6, noiseStrength);
             break;
         case SPOT_LIGHT:
-            relativeLightPos = light.position - positionInputs.positionWS;
-            lighting.lightDir = normalize(relativeLightPos);
-            lighting.attenuation = saturate(dot(surfaceNormal, lighting.lightDir));
+            relativeLightPos = light.positionVS - positionVS;
+            lighting.dirVS = normalize(relativeLightPos);
+            lighting.attenuation = saturate(dot(normal, lighting.dirVS));
             lighting.attenuation *= PointAttenuation(Length2(relativeLightPos), light.Range(), 1);
-            lighting.attenuation *= SpotAttenuation(lighting.lightDir, light.Direction(), light.CosAngle());
-            lighting.attenuation = Quantize(Dither8(lighting.attenuation, 0.1, noiseCoords), 6);
+            lighting.attenuation *= SpotAttenuation(lighting.dirVS, light.Direction(), light.CosAngle());
+            lighting.attenuation = Filtering::Quantize(lighting.attenuation + snormNoise * noiseStrength, 6, noiseStrength);
             break;
         default:
-            lighting.lightDir = float3(0, 1, 0);
+            lighting.dirVS = float3(0, 0, -1);
             lighting.attenuation = 0;
             break;
     }
+
     return lighting;
 }
 
-float3 DirectBRDF(Surface surface, LightingData lighting, float3 viewDir) {
+float3 DirectBRDF(Surface surface, LightingData lighting, float3 viewDirVS) {
     //return surface.normal;
     //return IncomingLight(surface, light);
-    const float3 h = SafeNormalize(lighting.lightDir + viewDir);
-    const float nh2 = Sq(saturate(dot(surface.normal, h)));
-    const float lh2 = Sq(saturate(dot(lighting.lightDir, h)));
+    const float3 h = SafeNormalize(lighting.dirVS + viewDirVS);
+    const float nh2 = Sq(saturate(dot(surface.normalVS, h)));
+    const float lh2 = Sq(saturate(dot(lighting.dirVS, h)));
     const float r2 = Sq(surface.roughness);
     const float d2 = Sq(float(nh2 * (r2 - 1.0) + 1.00001)); //todo: check if this is right
     const float normalization = surface.roughness * 4.0 + 2.0;
@@ -121,8 +130,8 @@ float3 DirectBRDF(Surface surface, LightingData lighting, float3 viewDir) {
 }
 
 float3 CartoonBRDF(Surface surface, LightingData lighting, float3 viewDir) {
-    const float3 h = SafeNormalize(lighting.lightDir + viewDir);
-    float specular  = normalize(dot(surface.normal, h));
+    const float3 h = SafeNormalize(lighting.dirVS + viewDir);
+    float specular  = normalize(dot(surface.normalVS, h));
     const float steps = max(surface.roughness * 2, 0.01);
     specular = round(specular * steps) / steps;
     const float3 baseLitColor = specular * surface.baseSpecular + surface.baseDiffuse;

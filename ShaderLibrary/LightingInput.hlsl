@@ -23,7 +23,13 @@ CBUFFER_END
 StructuredBuffer<Light> Lights;
 ByteAddressBuffer LightCullingResults;
 
+#if defined(ENABLE_SHADOWS) 
 TEXTURE2D_SHADOW(DirectionalShadowAtlas);
 TEXTURE2D_SHADOW(OtherShadowAtlas);
+#endif
+
+#if defined(ENABLE_SSAO)
+TEXTURE2D(SsaoTex)
+#endif
 
 #endif

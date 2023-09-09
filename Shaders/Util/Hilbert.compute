@@ -1,0 +1,22 @@
+#pragma kernel ComputeHilbertIndices
+
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Filtering.hlsl"
+
+RWByteAddressBuffer HilbertIndices;
+
+[numthreads(16, 16, 1)]
+void ComputeHilbertIndices(const uint2 dispatchID : SV_DispatchThreadID) {
+    const uint dispatchIndex = (dispatchID.y * 64 + dispatchID.x);
+    const uint bufferIndex = dispatchIndex / 2;
+    const bool bufferOffset = dispatchIndex % 2;
+    
+    uint hilbertIndex = Filtering::ComputeHilbertIndex(6, dispatchID.x, dispatchID.y);
+    if (bufferOffset) {
+        HilbertIndices.Store(bufferIndex, 0);
+        hilbertIndex <<= 16;
+    } else {
+        hilbertIndex &= 0xFFFF;
+    }
+    
+    HilbertIndices.InterlockedOr(bufferIndex, hilbertIndex);
+}

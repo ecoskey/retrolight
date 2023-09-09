@@ -1,15 +1,14 @@
 using System;
-using Data;
-using Unity.Mathematics;
-using Util;
+using Retrolight.Data;
+using Retrolight.Util;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
-using AccessFlags = UnityEngine.Experimental.Rendering.RenderGraphModule.IBaseRenderGraphBuilder.AccessFlags;
+
 // ReSharper disable InconsistentNaming
 
-namespace Passes {
+namespace Retrolight.Passes {
     public abstract class RenderPass : IDisposable {
         private readonly Retrolight pipeline;
 
@@ -26,8 +25,8 @@ namespace Passes {
         protected bool useHDR => pipeline.FrameData.UseHDR;
 
         protected RenderGraphBuilder AddRenderPass<T>(
-            string passName, out T passData,
-            BaseRenderFunc<T, RenderGraphContext> renderFunc
+            string passName, BaseRenderFunc<T, RenderGraphContext> renderFunc, 
+            out T passData
         ) where T : class, new() {
             var builder = renderGraph.AddRenderPass(
                 passName, out passData,
@@ -76,18 +75,18 @@ namespace Passes {
         protected TextureHandle CreateColorTex(string name = TextureUtils.DefaultColorTexName) =>
             renderGraph.CreateTexture(TextureUtils.ColorTex(name));
 
-        protected TextureHandle CreateColorTex(float2 scale, string name = TextureUtils.DefaultColorTexName) =>
+        protected TextureHandle CreateColorTex(Vector2 scale, string name = TextureUtils.DefaultColorTexName) =>
             renderGraph.CreateTexture(TextureUtils.ColorTex(scale, name));
         
         protected TextureHandle CreateColorTex(
-            float2 scale, GraphicsFormat format,
+            Vector2 scale, GraphicsFormat format,
             string name = TextureUtils.DefaultColorTexName
         ) => renderGraph.CreateTexture(TextureUtils.ColorTex(scale, format, name));
         
         protected TextureHandle CreateDepthTex(string name = TextureUtils.DefaultDepthTexName) =>
             renderGraph.CreateTexture(TextureUtils.DepthTex(name));
 
-        protected TextureHandle CreateDepthTex(float2 scale, string name = TextureUtils.DefaultDepthTexName) =>
+        protected TextureHandle CreateDepthTex(Vector2 scale, string name = TextureUtils.DefaultDepthTexName) =>
             renderGraph.CreateTexture(TextureUtils.DepthTex(scale, name));
         
         /*protected TextureHandle CreateUseColorTex(

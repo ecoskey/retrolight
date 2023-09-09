@@ -1,0 +1,211 @@
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Copyright (C) 2016-2021, Intel Corporation 
+// 
+// SPDX-License-Identifier: MIT
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// XeGTAO is based on GTAO/GTSO "Jimenez et al. / Practical Real-Time Strategies for Accurate Indirect Occlusion", 
+// https://www.activision.com/cdn/research/Practical_Real_Time_Strategies_for_Accurate_Indirect_Occlusion_NEW%20VERSION_COLOR.pdf
+// 
+// Implementation:  Filip Strugar (filip.strugar@intel.com), Steve Mccalla <stephen.mccalla@intel.com>         (\_/)
+// Version:         (see XeGTAO.h)                                                                            (='.'=)
+// Details:         https://github.com/GameTechDev/XeGTAO                                                     (")_(")
+//
+// Version history: see XeGTAO.h
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma kernel PrefilterDepthPass
+#pragma kernel GTAOLow
+#pragma kernel GTAOMedium
+#pragma kernel GTAOHigh
+#pragma kernel GTAOUltra
+#pragma kernel DenoisePass
+#pragma kernel DenoiseLastPass
+
+//#pragma multi_compile _ XE_GTAO_SHOW_NORMALS XE_GTAO_SHOW_EDGES XE_GTAO_SHOW_BENT_NORMALS
+
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Common.hlsl"
+#include "..\..\..\ShaderLibrary\Sampling.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/GBuffer.hlsl"
+//#include "Packages/net.cosc.retrolight/ShaderLibrary/HilbertInput.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Filtering.hlsl"
+
+
+#define XE_GTAO_USE_HALF_FLOAT_PRECISION 0
+#define XE_GTAO_FP32_DEPTHS 1
+#define XE_GTAO_USE_DEFAULT_CONSTANTS 1
+//#define XE_GTAO_COMPUTE_BENT_NORMALS 1
+
+/*#define XE_GTAO_NUMTHREADS_X 16
+#define XE_GTAO_NUMTHREADS_Y 16*/
+//#define VA_SATURATE saturate
+
+/*#define 2.xx 2
+#define 4.xx 4
+#define 8.xx 8*/
+
+#include "XeGTAO.h"
+#include "XeGTAO.hlsli"
+
+
+cbuffer GTAOConstantBuffer : register( b0 ) {
+    int2 ViewportSize;
+    float2 ViewportPixelSize; // .zw == 1.0 / ViewportSize.xy
+    float2 DepthUnpackConsts;
+    float2 CameraTanHalfFOV;
+    float2 NDCToViewMul;
+    float2 NDCToViewAdd;
+    float2 NDCToViewMul_x_PixelSize;
+    
+    float EffectRadius; // world (viewspace) maximum size of the shadow
+    float EffectFalloffRange;
+
+    float RadiusMultiplier;
+    float Padding0;
+    float FinalValuePower;
+    float DenoiseBlurBeta;
+
+    float SampleDistributionPower;
+    float ThinOccluderCompensation;
+    float DepthMIPSamplingOffset;
+    int NoiseIndex;
+}
+
+GTAOConstants GetGTAOConsts() {
+    GTAOConstants consts;
+    consts.ViewportSize = ViewportSize;
+    consts.ViewportPixelSize = ViewportPixelSize;
+    consts.DepthUnpackConsts = DepthUnpackConsts;
+    consts.CameraTanHalfFOV = CameraTanHalfFOV;
+    consts.NDCToViewMul = NDCToViewMul;
+    consts.NDCToViewAdd = NDCToViewAdd;
+    consts.NDCToViewMul_x_PixelSize = NDCToViewMul_x_PixelSize;
+    
+    consts.EffectRadius = EffectRadius;
+    consts.EffectFalloffRange = EffectFalloffRange;
+
+    consts.RadiusMultiplier = RadiusMultiplier;
+    consts.Padding0 = Padding0;
+    consts.FinalValuePower = FinalValuePower;
+    consts.DenoiseBlurBeta = DenoiseBlurBeta;
+
+    consts.SampleDistributionPower = SampleDistributionPower;
+    consts.ThinOccluderCompensation = ThinOccluderCompensation;
+    consts.DepthMIPSamplingOffset = DepthMIPSamplingOffset;
+    consts.NoiseIndex = NoiseIndex;
+    return consts;
+}
+
+// input output textures for the first pass (XeGTAO_PrefilterDepths16x16)
+Texture2D<float>     SrcRawDepth;        // : register(t0); // source depth buffer data (in NDC space in DirectX)
+RWTexture2D<lpfloat> OutWorkingDepthMip0;// : register(u0); // output viewspace depth MIP (these are views into SrcWorkingDepth MIP levels)
+RWTexture2D<lpfloat> OutWorkingDepthMip1;// : register(u1); // output viewspace depth MIP (these are views into SrcWorkingDepth MIP levels)
+RWTexture2D<lpfloat> OutWorkingDepthMip2;// : register(u2); // output viewspace depth MIP (these are views into SrcWorkingDepth MIP levels)
+RWTexture2D<lpfloat> OutWorkingDepthMip3;// : register(u3); // output viewspace depth MIP (these are views into SrcWorkingDepth MIP levels)
+RWTexture2D<lpfloat> OutWorkingDepthMip4;// : register(u4); // output viewspace depth MIP (these are views into SrcWorkingDepth MIP levels)
+
+// input output textures for the second pass (XeGTAO_MainPass)
+Texture2D<lpfloat>       SrcWorkingDepth; // : register(t0);// viewspace depth with MIPs, output by XeGTAO_PrefilterDepths16x16 and consumed by XeGTAO_MainPass
+//Texture2D<uint>          SrcHilbertLUT           : register( t5 ); // hilbert lookup table  (if any)
+RWTexture2D<uint>        OutWorkingAOTerm;// : register(u0); // output AO term (includes bent normals if enabled - packed as R11G11B10 scaled by AO)
+RWTexture2D<unorm float> OutWorkingEdges; // : register(u1); // output depth-based edges used by the denoiser
+//RWTexture2D<uint>        OutNormalmap     : register(u0); // output viewspace normals if generating from depth
+
+// input output textures for the third pass (XeGTAO_Denoise)
+Texture2D<uint>    SrcWorkingAOTerm;// : register(t0); // coming from previous pass
+Texture2D<lpfloat> SrcWorkingEdges; // : register(t1); // coming from previous pass
+RWTexture2D<uint>  OutFinalAOTerm;  // : register(u0); // final AO term - just 'visibility' or 'visibility + bent normals'
+
+//REVISIT IF TAA MAKES SENSE LATER
+// Engine-specific screen & temporal noise loader
+/*lpfloat2 SpatioTemporalNoise(uint2 pixCoord, uint temporalIndex) // without TAA, temporalIndex is always 0
+{
+    float2 noise;
+    #if 1   // Hilbert curve driving R2 (see https://www.shadertoy.com/view/3tB3z3)
+    #ifdef XE_GTAO_HILBERT_LUT_AVAILABLE // load from lookup texture...
+        uint index = g_srcHilbertLUT.Load( uint3( pixCoord % 64, 0 ) ).x;
+    #else // ...or generate in-place?
+    uint index = HilbertIndex(pixCoord.x, pixCoord.y);
+    #endif
+    index += 288 * (temporalIndex % 64);
+    // why 288? tried out a few and that's the best so far (with XE_HILBERT_LEVEL 6U) - but there's probably better :)
+    // R2 sequence - see http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+    return lpfloat2(frac(0.5 + index * float2(0.75487766624669276005, 0.5698402909980532659114)));
+    #else   // Pseudo-random (fastest but looks bad - not a good choice)
+    uint baseHash = Hash32( pixCoord.x + (pixCoord.y << 15) );
+    baseHash = Hash32Combine( baseHash, temporalIndex );
+    return lpfloat2( Hash32ToFloat( baseHash ), Hash32ToFloat( Hash32( baseHash ) ) );
+    #endif
+}*/
+
+// Engine-specific entry point for the first pass
+// <- hard coded to 8x8; each thread computes 2x2 blocks so processing 16x16 block: Dispatch needs to be called with (width + 16-1) / 16, (height + 16-1) / 16
+[numthreads(8, 8, 1)]
+void PrefilterDepthPass(uint2 dispatchThreadID : SV_DispatchThreadID, uint2 groupThreadID : SV_GroupThreadID) {
+    XeGTAO_PrefilterDepths16x16(
+        dispatchThreadID, groupThreadID, GetGTAOConsts(), SrcRawDepth, POINT_SAMPLER, OutWorkingDepthMip0,
+        OutWorkingDepthMip1, OutWorkingDepthMip2, OutWorkingDepthMip3, OutWorkingDepthMip4
+    );
+}
+
+// Engine-specific entry point for the second pass
+[numthreads(XE_GTAO_NUMTHREADS_X, XE_GTAO_NUMTHREADS_Y, 1)]
+void GTAOLow(const uint2 pixCoord : SV_DispatchThreadID) {
+    const float2 r2Noise = Filtering::R2Sequence(Filtering::ComputeHilbertIndex(64, pixCoord.x, pixCoord.y));
+    XeGTAO_MainPass(
+        pixCoord, 1, 2, r2Noise, LoadNormal(pixCoord),
+        GetGTAOConsts(), SrcWorkingDepth, POINT_SAMPLER, OutWorkingAOTerm, OutWorkingEdges
+    );
+}
+
+// Engine-specific entry point for the second pass
+[numthreads(XE_GTAO_NUMTHREADS_X, XE_GTAO_NUMTHREADS_Y, 1)]
+void GTAOMedium(const uint2 pixCoord : SV_DispatchThreadID) {
+    const float2 r2Noise = Filtering::R2Sequence(Filtering::ComputeHilbertIndex(64, pixCoord.x, pixCoord.y));
+    XeGTAO_MainPass(
+        pixCoord, 2, 2, r2Noise, LoadNormal(pixCoord),
+        GetGTAOConsts(), SrcWorkingDepth, POINT_SAMPLER, OutWorkingAOTerm, OutWorkingEdges
+    );
+}
+
+// Engine-specific entry point for the second pass
+[numthreads(XE_GTAO_NUMTHREADS_X, XE_GTAO_NUMTHREADS_Y, 1)]
+void GTAOHigh(const uint2 pixCoord : SV_DispatchThreadID) {
+    const float2 r2Noise = Filtering::R2Sequence(Filtering::ComputeHilbertIndex(64, pixCoord.x, pixCoord.y));
+    XeGTAO_MainPass(
+        pixCoord, 3, 3, r2Noise, LoadNormal(pixCoord),
+        GetGTAOConsts(), SrcWorkingDepth, POINT_SAMPLER, OutWorkingAOTerm, OutWorkingEdges
+    );
+}
+
+// Engine-specific entry point for the second pass
+[numthreads(XE_GTAO_NUMTHREADS_X, XE_GTAO_NUMTHREADS_Y, 1)]
+void GTAOUltra(const uint2 pixCoord : SV_DispatchThreadID) {
+    const float2 r2Noise = Filtering::R2Sequence(Filtering::ComputeHilbertIndex(64, pixCoord.x, pixCoord.y));
+    XeGTAO_MainPass(
+        pixCoord, 9, 3, r2Noise, LoadNormal(pixCoord),
+        GetGTAOConsts(), SrcWorkingDepth, POINT_SAMPLER, OutWorkingAOTerm, OutWorkingEdges
+    );
+}
+
+// Engine-specific entry point for the third pass
+[numthreads(XE_GTAO_NUMTHREADS_X, XE_GTAO_NUMTHREADS_Y, 1)]
+void DenoisePass(const uint2 dispatchThreadID : SV_DispatchThreadID) {
+    const uint2 pixCoordBase = dispatchThreadID * uint2(2, 1);
+    // we're computing 2 horizontal pixels at a time (performance optimization)
+    XeGTAO_Denoise(
+        pixCoordBase, GetGTAOConsts(), SrcWorkingAOTerm, SrcWorkingEdges,
+        POINT_SAMPLER, OutFinalAOTerm, false
+    );
+}
+
+[numthreads(XE_GTAO_NUMTHREADS_X, XE_GTAO_NUMTHREADS_Y, 1)]
+void DenoiseLastPass(const uint2 dispatchThreadID : SV_DispatchThreadID) {
+    const uint2 pixCoordBase = dispatchThreadID * uint2(2, 1);
+    // we're computing 2 horizontal pixels at a time (performance optimization)
+    // g_samplerPointClamp is a sampler with D3D12_FILTER_MIN_MAG_MIP_POINT filter and D3D12_TEXTURE_ADDRESS_MODE_CLAMP addressing mode
+    XeGTAO_Denoise(
+        pixCoordBase, GetGTAOConsts(), SrcWorkingAOTerm, SrcWorkingEdges,
+        POINT_SAMPLER, OutFinalAOTerm, true
+    );
+}

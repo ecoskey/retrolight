@@ -1,13 +1,8 @@
-using System;
-using System.Collections.Generic;
-using Data;
-using Unity.Collections;
-using static Passes.RenderPass;
-using UnityEngine;
+using Retrolight.Data;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
-namespace Passes {
+namespace Retrolight.Passes {
     public class SetupPass : RenderPass { //todo: make not legacy renderpass
         private readonly ConstantBuffer<ViewportParams> viewportParamsBuffer;
         private bool viewportBufferAllocated = false;
@@ -16,16 +11,14 @@ namespace Passes {
             viewportParamsBuffer = new ConstantBuffer<ViewportParams>();
         }
         
-        private class SetupPassData { }
-
         public void Run() {
-            using var builder = renderGraph.AddRenderPass<SetupPassData>("Setup Pass", out _, new ProfilingSampler("Setup Pass"));
+            using var builder = AddRenderPass("Setup Pass", Render, out Unit _);
             builder.AllowPassCulling(false);
-            builder.SetRenderFunc<SetupPassData>(Render);
+            builder.SetRenderFunc<Unit>(Render);
             //builder.AllowGlobalStateModification(true);
         }
         
-        private void Render(SetupPassData passData, RenderGraphContext ctx) {
+        private void Render(Unit _, RenderGraphContext ctx) {
             if (!viewportBufferAllocated) {
                 viewportBufferAllocated = true;
                 viewportParamsBuffer.SetGlobal(ctx.cmd, Constants.ViewportParamsId);

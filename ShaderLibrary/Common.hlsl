@@ -20,7 +20,21 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
 
-#define ORTHOGRAPHIC_CAMERA unity_OrthoParams.w
+// Transforms normal from object to world space
+float3 TransformObjectToViewNormal(float3 normalOS, bool doNormalize = true) {
+    #ifdef UNITY_ASSUME_UNIFORM_SCALING
+    return TransformObjectToViewDir(normalOS, doNormalize);
+    #else
+    // Normal need to be multiply by inverse transpose
+    float3 normalVS = mul(normalOS, (float3x3)GetWorldToObjectMatrix() * (float3x3)GetViewToWorldMatrix());
+    if (doNormalize)
+        return SafeNormalize(normalVS);
+
+    return normalVS;
+    #endif
+}
+
+#define IS_ORTHOGRAPHIC_CAMERA (unity_OrthoParams.w == 1.0)
 
 #define ACCESS_PROP(prop) UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, prop)
 
@@ -36,14 +50,6 @@ uint2 PackFloat4(float4 src) {
         f32tof16(src.x) | f32tof16(src.y) << 16,
         f32tof16(src.z) | f32tof16(src.w) << 16
     );
-}
-
-float3 DecodeNormal(float4 sample, float scale) {
-    #if defined(UNITY_NO_DXT5nm)
-	return UnpackNormalRGB(sample, scale);
-    #else
-    return UnpackNormalmapRGorAG(sample, scale);
-    #endif
 }
 
 float3 NormalTangentToWorld(float3 normalTS, float3 normalWS, float4 tangentWS) {

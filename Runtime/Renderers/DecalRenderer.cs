@@ -1,8 +1,7 @@
-using static Unity.Mathematics.math;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Renderers {
+namespace Retrolight.Renderers {
     [RequireComponent(typeof(MeshRenderer), typeof(MeshFilter))]
     [ExecuteInEditMode]
     public class DecalRenderer : MonoBehaviour {
@@ -10,7 +9,7 @@ namespace Renderers {
         private Material decalMaterial;
         
         private void Awake() {
-            decalMesh = CoreUtils.CreateCubeMesh(float3(0), float3(1));
+            decalMesh = CoreUtils.CreateCubeMesh(Vector3.zero, Vector3.one);
             decalMaterial = CoreUtils.CreateEngineMaterial("Retrolight/Decal");
             RefreshProperties();
         }

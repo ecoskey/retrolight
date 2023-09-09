@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Data {
+namespace Retrolight.Data {
     [Serializable]
     public struct ShadowSettings {
         public bool enableShadows;

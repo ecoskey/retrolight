@@ -1,10 +1,8 @@
 using System;
-using Data;
-using UnityEngine;
+using Retrolight.Data;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
-using UnityEngine.Rendering;
 
-namespace Passes {
+namespace Retrolight.Passes {
     public abstract class RenderProcedure : IDisposable {
         /// <summary>
         /// NOTE: ONLY USE THIS TO INITIALIZE RENDER PASSES

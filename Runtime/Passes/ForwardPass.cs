@@ -1,10 +1,9 @@
-using Data;
+using Retrolight.Data;
 using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
-using AccessFlags = UnityEngine.Experimental.Rendering.RenderGraphModule.IBaseRenderGraphBuilder.AccessFlags;
 
-namespace Passes {
+namespace Retrolight.Passes {
     public class ForwardPass : RenderPass {
         public ForwardPass(Retrolight retrolight) : base(retrolight) { }
         
@@ -13,8 +12,11 @@ namespace Passes {
             public RendererListHandle TransparentRenderers;
         }
         
-        public void Run(GBuffer gBuffer, AllocatedLights allocatedLights, BufferHandle culledLights, TextureHandle finalColorTex) {
-            using var builder = AddRenderPass<TransparentPassData>("Transparent Pass", out var passData, Render);
+        public void Run(
+            GBuffer gBuffer, TextureHandle depthTex, AllocatedLights allocatedLights, 
+            BufferHandle culledLights, TextureHandle sceneTex, bool writeDepth
+        ) {
+            using var builder = AddRenderPass("Transparent Pass", Render, out TransparentPassData passData);
             
             //builder.AllowPassCulling(false);
             //builder.AllowRendererListCulling(false);
@@ -23,13 +25,13 @@ namespace Passes {
             //allocatedLights.UseAll(builder); //todo: separate depth from this, because it's likely to be used as an FBO attachment
 
             allocatedLights.ReadAll(builder);
-            builder.ReadBuffer(culledLights);//builder.UseBuffer(culledLights, AccessFlags.Read); 
-            gBuffer.ReadAll(builder);//builder.UseTextureFragment(finalColorTex, 0, AccessFlags.Write);
+            builder.ReadBuffer(culledLights); //builder.UseBuffer(culledLights, AccessFlags.Read); 
+            gBuffer.ReadAll(builder); //builder.UseTextureFragment(finalColorTex, 0, AccessFlags.Write);
             //builder.UseTextureFragmentDepth(gBuffer.Depth, AccessFlags.ReadWrite);
             
             //lightingData.UseAll(builder);
-            builder.UseColorBuffer(finalColorTex, 0);
-            builder.UseDepthBuffer(gBuffer.Depth, DepthAccess.ReadWrite);
+            builder.UseColorBuffer(sceneTex, 0);
+            builder.UseDepthBuffer(depthTex, writeDepth ? DepthAccess.ReadWrite : DepthAccess.Read);
 
             var opaqueRenderersDesc = new RendererListDesc(Constants.ForwardOpaquePassId, cull, camera) {
                 sortingCriteria = SortingCriteria.CommonOpaque,

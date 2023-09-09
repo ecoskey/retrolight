@@ -1,9 +1,10 @@
 {
     "name": "Cosc.Retrolight.Runtime",
-    "rootNamespace": "",
+    "rootNamespace": "Retrolight",
     "references": [
         "Unity.RenderPipelines.Core.Runtime",
-        "Unity.Mathematics"
+        "Unity.Mathematics",
+        "Unity.Burst"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

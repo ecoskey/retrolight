@@ -3,77 +3,91 @@
 
 #include "Light.hlsl"
 
-struct AABB {
-    float3 min;
-    float3 max;
-};
+namespace Culling {
+    // ReSharper disable once CppInconsistentNaming
+    struct AABB {
+        float3 min;
+        float3 max;
+    };
 
-struct Plane {
-    float3 normal;
-    float dist;
-};
+    struct Plane {
+        float3 normal;
+        float dist;
+    };
 
-struct Frustum {
-    Plane u;
-    Plane d;
-    Plane l;
-    Plane r;
-};
+    struct Frustum {
+        Plane planes[6]; // near, far, up, down, left, right;
+    };
 
-struct Sphere {
-    float3 pos;
-    float r;
-};
+    struct Sphere {
+        float3 pos;
+        float r;
+    };
 
-struct Cone {
+    struct Cone {
     
-};
+    };
 
-struct Capsule {
-    float3 a;
-    float3 b;
-    float r;
-};
+    struct Capsule {
+        float3 a;
+        float3 b;
+        float r;
+    };
 
-Sphere PointLightCullVolume(Light light) {
-    Sphere volume;
-    volume.pos = light.position;
-    volume.r = light.Range();
-    return volume;
-}
+    Sphere PointLightVolume(Light light) {
+        Sphere volume;
+        volume.pos = light.positionVS;
+        volume.r = light.Range();
+        return volume;
+    }
 
-Capsule LineLightCullVolume(Light light) {
-    Capsule volume;
-    volume.a = light.position;
-    volume.b = light.position + light.Direction() * light.Range();
-    volume.r = light.CosAngle();
-    return volume;
-}
+    /*Capsule LineLightCullVolume(Light light) {
+        Capsule volume;
+        volume.a = light.position;
+        volume.b = light.position + light.Direction() * light.Range();
+        volume.r = light.CosAngle();
+        return volume;
+    }*/
+    
+    float3 ClosestPointAABB(AABB aabb, float3 pos) {
+        return clamp(pos, aabb.min, aabb.max);
+    }
+    
+    float DistToPlane(Plane plane, float3 pos) {
+        return dot(plane.normal, pos) - plane.dist;
+    }
 
-float2 UVToScreenSpaceXY(float2 uv) {
-    return unity_OrthoParams.xy * (uv * 2 - 1);
-}
+    float3 ClosestPointPlane(Plane plane, float3 pos) {
+        const float distToPlane = DistToPlane(plane, pos);
+        return pos - distToPlane * plane.normal;
+    }
 
-void TransformSphereToView(inout Sphere volume) {
-    volume.pos = TransformWorldToView(volume.pos);
-}
+    bool AABBvsAABB(AABB a, AABB b) {
+        return all(a.min <= b.max && a.max >= b.min);
+    }
 
+    bool SphereVsAABB(Sphere sphere, AABB aabb) {
+        const float3 closestPoint = ClosestPointAABB(aabb, sphere.pos);
+        const float3 dist = sphere.pos - closestPoint;
+        return Length2(dist) < Sq(sphere.r);
+    }
 
-AABB OrthoVolumeFromUVDepth(float2 minUv, float2 maxUv, float minDepth, float maxDepth) {
-    AABB volume;
-    volume.min = float3(UVToScreenSpaceXY(minUv), minDepth);
-    volume.max = float3(UVToScreenSpaceXY(maxUv), maxDepth);
-    return volume;
-}
+    bool SphereVsPlane(Sphere sphere, Plane plane) {
+        return Sq(DistToPlane(plane, sphere.pos)) + Sq(sphere.r) >= 0;
+    }
 
-float3 ClosestPointOnAABB(AABB aabb, float3 pos) {
-    return clamp(pos, aabb.min, aabb.max);
-}
+    bool SphereVsFrustum(Sphere sphere, Frustum frustum) {
+        //take constant calculation out of loop
+        const float rad2 = Sq(sphere.r);
+        
+        UNITY_UNROLLX(6)
+        for (int i = 0; i < 6; i++)
+            if (Sq(DistToPlane(frustum.planes[i], sphere.pos)) + rad2 >= 0) return true;
 
-bool SphereIntersectsAABB(Sphere sphere, AABB aabb) {
-    float3 closestPoint = ClosestPointOnAABB(aabb, sphere.pos);
-    float3 dist = sphere.pos - closestPoint;
-    return (dist.x * dist.x + dist.y * dist.y + dist.z * dist.z) < (sphere.r * sphere.r);
+        return false;
+    }
+
+    
 }
 
 #endif

@@ -1,10 +1,8 @@
 using System;
-using Unity.Mathematics;
-using static Unity.Mathematics.math;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Overrides {
+namespace Retrolight.Overrides {
     [Serializable, VolumeComponentMenu("PostProcessing/Channel Mixer"), SupportedOnRenderPipeline(typeof(RetrolightAsset))]
     public class ChannelMixer : VolumeComponent {
         [Header("Channel Mixer")]
@@ -12,6 +10,6 @@ namespace Overrides {
         public Vector3Parameter green = new Vector3Parameter(Vector3.up);
         public Vector3Parameter blue = new Vector3Parameter(Vector3.forward);
 
-        public float3x3 MixerMatrix => float3x3(red.value, green.value, blue.value);
+        //public Matrix4x4 MixerMatrix => new Matrix4x4(red.value, green.value, blue.value);
     }
 }

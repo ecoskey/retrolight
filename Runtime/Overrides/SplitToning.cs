@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Overrides {
+namespace Retrolight.Overrides {
     [Serializable, VolumeComponentMenu("PostProcessing/Split Toning"), SupportedOnRenderPipeline(typeof(RetrolightAsset))]
     public class SplitToning : VolumeComponent {
         [Header("SplitToning")] 

@@ -44,12 +44,12 @@ uint2 ClampPixelPos(int2 pos) {
     return ClampPixelPos(pos, PixelCount);
 }
 
-float2 PixelToUV(uint2 pos, float2 invResolution) {
-    return float2(pos) * invResolution;
+float2 PixelToNDC(uint2 pos, float2 invResolution) {
+    return (float2(pos) + 0.5) * invResolution;
 }
 
-float2 PixelToUV(uint2 pos) {
-    return PixelToUV(pos, Resolution.zw);
+float2 PixelToNDC(uint2 pos) {
+    return PixelToNDC(pos, Resolution.zw);
 }
 
 #endif

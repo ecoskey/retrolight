@@ -1,6 +1,6 @@
 using System;
 
-namespace Data {
+namespace Retrolight.Data {
     public class NotInitializedException : InvalidOperationException {
         public NotInitializedException(string message) : base(message) { }
         

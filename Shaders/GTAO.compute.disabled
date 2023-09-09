@@ -1,0 +1,219 @@
+#pragma kernel GenerateDepthMips
+#pragma kernel GTAO
+#pragma kernel DenoiseAO
+
+#pragma require uav
+
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Common.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Viewport.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/GBuffer.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Filtering.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Random.hlsl"
+#include "Packages/net.cosc.retrolight/Runtime/Data/GTAOSettings.cs.hlsl"
+
+#define GTAO_MIP_LEVELS 4
+RW_TEXTURE2D(float, DepthMip0);
+RW_TEXTURE2D(float, DepthMip1);
+RW_TEXTURE2D(float, DepthMip2);
+RW_TEXTURE2D(float, DepthMip3);
+RW_TEXTURE2D(float, DepthMip4);
+
+groupshared float depthScratch[8][8];
+
+//todo: NOT THIS
+static const float configEffectRadius = 1;
+static const float configEffectFalloffRange = 1;
+
+//MIT LICENSE - Copyright (C) 2016-2021, Intel Corporation 
+float DepthFilter(float depth0, float depth1, float depth2, float depth3) {
+    const float maxDepth = max(max(depth0, depth1), max(depth2, depth3));
+    const float depthRangeScale = 0.75;
+    
+    const float effectRadius = depthRangeScale * Radius * 1.457;
+    const float falloffRange = 0.615 * Radius;
+
+    const float falloffFrom = effectRadius * (1.0 - FalloffRange);
+    // fadeout precompute optimisation
+    const float falloffMul = -1.0 / falloffRange ;
+    const float falloffAdd = falloffFrom / falloffRange + 1.0;
+
+    const float weight0 = saturate((maxDepth - depth0) * falloffMul + falloffAdd);
+    const float weight1 = saturate((maxDepth - depth1) * falloffMul + falloffAdd);
+    const float weight2 = saturate((maxDepth - depth2) * falloffMul + falloffAdd);
+    const float weight3 = saturate((maxDepth - depth3) * falloffMul + falloffAdd);
+
+    const float weightSum = weight0 + weight1 + weight2 + weight3;
+    return (weight0 * depth0 + weight1 * depth1 + weight2 * depth2 + weight3 * depth3) / weightSum;
+}
+
+real ClampDepth(float depth) {
+    return clamp(depth, 0.0, REAL_MAX);
+}
+
+[numthreads(8,8,1)]
+void GenerateDepthMips(
+    const uint2 dispatchID : SV_DispatchThreadID,
+    const uint2 groupThreadID : SV_GroupThreadID
+) {
+    //mip 0
+    const uint2 offsetPos = 2 * dispatchID;
+    const float2 uv = (offsetPos + 1) * Resolution.zw;
+    const float4 depthGather = GATHER_RED_TEXTURE2D(DepthTex, POINT_SAMPLER, uv);
+    const float depth0 = ClampDepth(DecodeEyeDepth(depthGather.w));
+    const float depth1 = ClampDepth(DecodeEyeDepth(depthGather.z));
+    const float depth2 = ClampDepth(DecodeEyeDepth(depthGather.x));
+    const float depth3 = ClampDepth(DecodeEyeDepth(depthGather.y));
+    DepthMip0[offsetPos + uint2(0, 0)] = depth0;
+    DepthMip0[offsetPos + uint2(1, 0)] = depth1;
+    DepthMip0[offsetPos + uint2(0, 1)] = depth2;
+    DepthMip0[offsetPos + uint2(1, 1)] = depth3;
+
+    //mip 1
+    const float dm1 = DepthFilter(depth0, depth1, depth2, depth3);
+    DepthMip1[dispatchID] = dm1;
+    depthScratch[groupThreadID.x][groupThreadID.y] = dm1;
+
+    GroupMemoryBarrierWithGroupSync();
+
+    //mip 2
+    UNITY_BRANCH
+    if (all(groupThreadID % 2 == 0)) {
+        const float in0 = depthScratch[groupThreadID.x+0][groupThreadID.y+0];
+        const float in1 = depthScratch[groupThreadID.x+1][groupThreadID.y+0];
+        const float in2 = depthScratch[groupThreadID.x+0][groupThreadID.y+1];
+        const float in3 = depthScratch[groupThreadID.x+1][groupThreadID.y+1];
+
+        const float dm2 = DepthFilter(in0, in1, in2, in3);
+        DepthMip2[dispatchID / 2] = dm2;
+        depthScratch[groupThreadID.x][groupThreadID.y] = dm2;
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    //mip 3
+    UNITY_BRANCH
+    if (all(groupThreadID % 4 == 0)) {
+        const float in0 = depthScratch[groupThreadID.x+0][groupThreadID.y+0];
+        const float in1 = depthScratch[groupThreadID.x+2][groupThreadID.y+0];
+        const float in2 = depthScratch[groupThreadID.x+0][groupThreadID.y+2];
+        const float in3 = depthScratch[groupThreadID.x+2][groupThreadID.y+2];
+
+        const float dm3 = DepthFilter(in0, in1, in2, in3);
+        DepthMip3[dispatchID / 4] = dm3;
+        depthScratch[groupThreadID.x][groupThreadID.y] = dm3;
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    //mip 4
+    UNITY_BRANCH
+    if (all(groupThreadID % 8 == 0)) {
+        const float in0 = depthScratch[groupThreadID.x+0][groupThreadID.y+0];
+        const float in1 = depthScratch[groupThreadID.x+4][groupThreadID.y+0];
+        const float in2 = depthScratch[groupThreadID.x+0][groupThreadID.y+4];
+        const float in3 = depthScratch[groupThreadID.x+4][groupThreadID.y+4];
+
+        const float dm4 = DepthFilter(in0, in1, in2, in3);
+        DepthMip4[dispatchID / 8] = dm4;
+    }
+}
+
+
+TEXTURE2D(FilteredDepth);
+RW_TEXTURE2D(float, GTAOTex);
+ByteAddressBuffer HilbertIndices;
+
+CBUFFER_START(GTAOInputs)
+uint SliceCount;
+uint SliceSamples;
+CBUFFER_END
+
+
+
+uint GetHilbertIndex(uint2 dispatchID) {
+    const uint dispatchIndex = dispatchID.y * Resolution.x + dispatchID.x;
+    const uint bufferIndex = dispatchIndex / 2;
+    const bool bufferOffset = dispatchIndex % 2;
+    const uint rawIndex = HilbertIndices.Load(bufferIndex);
+    return bufferOffset ? rawIndex >> 16 : rawIndex & 0xFFFF;
+}
+
+float3 GetViewDirVS(float3 positionVS) {
+    return IS_ORTHOGRAPHIC_CAMERA ? float3(0, 0, 1): normalize(-positionVS);
+}
+
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
+void GTAO(
+    const uint2 dispatchID : SV_DispatchThreadID,
+    const uint2 groupThreadID : SV_GroupThreadID
+) {
+    float2 uv = (float2(dispatchID) + 0.5) * Resolution.zw;
+
+    float eyeDepth = LOAD_TEXTURE2D_LOD(FilteredDepth, dispatchID, 0).r;
+
+    //TODO: VIEWSPACE Z AS PARAM IS INCORRECT
+    const float3 positionVS = ComputeViewSpacePosition(uv, eyeDepth, UNITY_MATRIX_I_P);
+    const float3 normalVS = LoadNormal(dispatchID);
+
+    const float pixelTooCloseThreshold  = 1.3;
+
+    const float3 viewDir = GetViewDirVS(positionVS);
+    float visibility = 0;
+
+    //from intel implementation, refer if changing depth buffer format
+    eyeDepth *= 0.99999;
+
+    float radiusSS = 0; //TODO
+
+    const uint hilbertIndex = GetHilbertIndex(dispatchID);
+    const float2 r2Noise = Filtering::R2Sequence(hilbertIndex);
+
+    //UNITY_LOOP
+    for (uint i = 0; i < SliceCount; i++) {
+        const float slice = (i + r2Noise.x) / SliceCount;
+        const float phi = slice * PI;
+        const float2 omega = float2(cos(phi), sin(phi));
+        const float3 dirVS = float3(omega, 0);
+        const float3 orthoDirVS = dirVS - (dot(dirVS, viewDir) * viewDir);
+        const float3 axisVec = normalize(cross(orthoDirVS, viewDir));
+        const float3 projectedNormal = normalVS - axisVec * dot(normalVS, axisVec);
+        const float signNorm = sign(dot(orthoDirVS, projectedNormal));
+        const float3 projectedNormalLength = length(projectedNormal);
+        const float cosNorm = saturate(dot(projectedNormal, viewDir) / projectedNormalLength);
+        const float n = signNorm * FastACos(cosNorm);
+
+        const float lowHorizonCos0 = cos(n+HALF_PI);
+        const float lowHorizonCos1 = cos(n-HALF_PI);
+
+        const float horizonCos0 = lowHorizonCos0; //-1;
+        const float horizonCos1 = lowHorizonCos1; //-1;
+
+
+        for (uint j = 0; j < SliceSamples; j++) {
+            const float stepNoise = frac(Filtering::R1Sequence(i + j * SliceSamples) + r2Noise.y);
+            float s = (j + stepNoise) / SliceSamples;
+            //TODO: s = pow(s, sampleDistributionPower);
+            //TODO s += minS;
+            const float sampleOffset = s * omega;
+            const float sampleOffsetLength = length(sampleOffset);
+            const float mipLevel = 0;
+            //TODO: const float mipLevel = clamp(log2(sampleOffsetLength) - consts.DepthMIPSamplingOffset, 0, GTAO_MIP_LEVELS );
+            //TODO: sampleOffset = round(sampleOffset) * consts.ViewportPixelSize;
+            float2 samplePosSS0 = uv + sampleOffset;
+            float sampledZ0 = SAMPLE_TEXTURE2D_LOD(FilteredDepth, POINT_SAMPLER, samplePosSS0, mipLevel);
+            float3 samplePosVS0 = float3(0,0,0); //TODO TODO TODO: ComputeViewSpacePosition(uv, sampledZ0) <--- NOT DEVICE DEPTH, EYE DEPTH
+
+            float2 samplePosSS1 = uv + sampleOffset;
+            float sampledZ1 = SAMPLE_TEXTURE2D_LOD(FilteredDepth, POINT_SAMPLER, samplePosSS0, mipLevel);
+            float3 samplePosVS1 = float3(0,0,0); //TODO TODO TODO: ComputeViewSpacePosition(uv, sampledZ0) <--- NOT DEVICE DEPTH, EYE DEPTH
+        }
+    }
+}
+
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
+void DenoiseAO(
+    const uint2 dispatchID : SV_DispatchThreadID,
+    const uint2 groupThreadID : SV_GroupThreadID
+) {
+    uint t = 1 + 1;
+}

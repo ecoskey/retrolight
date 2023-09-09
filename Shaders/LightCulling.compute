@@ -1,16 +1,37 @@
 #pragma kernel LightCulling
 
-#include "../ShaderLibrary/Common.hlsl"
-#include "../ShaderLibrary/Viewport.hlsl"
-#include "../ShaderLibrary/Culling.hlsl"
+#pragma multi_compile_local _ EDITOR_DEBUG
+
+//#pragma multi_compile _ UNITY_PLATFORM_SUPPORTS_WAVE UNITY_HW_SUPPORTS_WAVE
+
+//#pragma multi_compile _ UNITY_DEVICE_SUPPORTS_NATIVE_16BIT //todo: maybe not this one
+#pragma multi_compile _             \
+    UNITY_PLATFORM_SUPPORTS_WAVE_32 \
+    UNITY_PLATFORM_SUPPORTS_WAVE_64 
+
+#pragma multi_compile _           \
+    UNITY_DEVICE_SUPPORTS_WAVE_32 \
+    UNITY_DEVICE_SUPPORTS_WAVE_64 
+
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Common.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Culling.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/GBuffer.hlsl"
+#include "Packages/net.cosc.retrolight/ShaderLibrary/Viewport.hlsl"
+
+#define THREADING_BLOCK_SIZE (TILE_SIZE * TILE_SIZE)
+#if defined(UNITY_HW_WAVE_SIZE)
+#define THREADING_WAVE_SIZE UNITY_HW_WAVE_SIZE
+#endif
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Threading.hlsl"
 
 #define MAX_LIGHTS 1024
 
 #define BUCKET_SIZE 32
-#define TILE_BUCKET_COUNT(Num) ((Num + BUCKET_SIZE - 1) / BUCKET_SIZE)
+#define TILE_BUCKET_COUNT(Num) (((Num) + BUCKET_SIZE - 1) / BUCKET_SIZE)
 #define LIGHT_TILE_BUCKET_COUNT TILE_BUCKET_COUNT(MAX_LIGHTS)
 
 uint LightCount;
+
 StructuredBuffer<Light> Lights;
 RWByteAddressBuffer LightCullingResults;
 
@@ -19,128 +40,164 @@ groupshared uint uMinDepth = 0xFFFFFFFF;
 groupshared uint uMaxDepth = 0;
 groupshared uint depthMask = 0;
 
-struct ThreadInfo {
-    uint2 id : SV_GroupID;
-    uint index : SV_GroupIndex;
-    uint2 dispatchId : SV_DispatchThreadID;
-    uint2 subId : SV_GroupThreadID;
-};
+#ifdef EDITOR_DEBUG
+groupshared uint tileLightCount = 0;
+#endif
 
 void AllowLight(uint index) {
-    uint bucketIndex = index / BUCKET_SIZE;
-    uint bitIndex = index % BUCKET_SIZE;
+    const uint bucketIndex = index / BUCKET_SIZE;
+    const uint bitIndex = index % BUCKET_SIZE;
     InterlockedOr(tile[bucketIndex], 1 << bitIndex);
 }
 
-uint PointLightMask(Sphere screenVolume, float fMinDepth, float depthRangeRecip) {
-    const float minDepth = screenVolume.pos.z - screenVolume.r;
-    const float maxDepth = screenVolume.pos.z + screenVolume.r;
-    const uint minIndex = clamp(0, BUCKET_SIZE - 1, floor((minDepth - fMinDepth) * depthRangeRecip));
-    const uint maxIndex = clamp(0, BUCKET_SIZE - 1, floor((maxDepth - fMinDepth) * depthRangeRecip));
-    uint mask = 0xFFFFFFFF;
-    mask >>= 31 - (maxIndex - minIndex);
+#ifdef EDITOR_DEBUG
+RW_TEXTURE2D(float3, CullingDebugTex);
+
+static const float3 debugCoeffs[2][4] = {
+    //rainbow
+    { float3(.5, .5, .5), float3(.5, .5, .5), float3(.8, .8, .8), float3(.21, .52, .78) },
+    //blue gradient
+    { float3(.5, .5, .5), float3(.55, .55, .55), float3(0.45, .45, .45), float3(.47, .57, .67) }
+};
+
+float3 Palette(float t, int palette) {
+    const float3 a = debugCoeffs[palette][0];
+    const float3 b = debugCoeffs[palette][1];
+    const float3 c = debugCoeffs[palette][2];
+    const float3 d = debugCoeffs[palette][3];
+    
+    return a + b * cos(TWO_PI * (c * t + d));
+}
+#endif
+
+//todo: depth is raw device depth, but we're comparing it to world-space position of the volume
+uint PointLightMask(Culling::Sphere screenVolume, float minDepth, float depthRangeRecip) {
+    const float sMinDepth = screenVolume.pos.z - screenVolume.r;
+    const float sMaxDepth = screenVolume.pos.z + screenVolume.r;
+    const uint minIndex = clamp(0, BUCKET_SIZE - 1, floor((sMinDepth - minDepth) * depthRangeRecip));
+    const uint maxIndex = clamp(0, BUCKET_SIZE - 1, floor((sMaxDepth - minDepth) * depthRangeRecip));
+    uint mask = UINT_MAX;
+    mask >>= (BUCKET_SIZE - 1) - (maxIndex - minIndex);
     mask <<= minIndex;
     return mask;
 }
 
-[numthreads(TILE_SIZE, TILE_SIZE, 1)]
-void LightCulling(const ThreadInfo input) {
-    //if (IsPixelOOB(input.dispatchId)) return;
-    /*const float depth = LoadEyeDepth(input.dispatchId);
-    #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
-    const float _minDepth = WaveActiveMin(depth);
-    const float _maxDepth = WaveActiveMax(depth);
-    if (WaveIsFirstLane()) {
-        InterlockedMin(uMinDepth, asuint(_minDepth));
-        InterlockedMax(uMaxDepth, asuint(_maxDepth));
+float2 UVToScreenSpaceXY(float2 uv) {
+    return unity_OrthoParams.xy * (uv * 2 - 1);
+}
+
+Culling::AABB GetTileVolume(float2 minUV, float2 maxUV, float minDepth, float maxDepth) {
+    Culling::AABB volume;
+    
+    UNITY_BRANCH
+    if (IS_ORTHOGRAPHIC_CAMERA) {
+        volume.min = ComputeViewSpacePosition(minUV, minDepth, UNITY_MATRIX_I_P);
+        volume.max = ComputeViewSpacePosition(maxUV, maxDepth, UNITY_MATRIX_I_P);
     }
-    #else
-    InterlockedMin(uMinDepth, asuint(depth));
-    InterlockedMax(uMaxDepth, asuint(depth));
-    #endif
+    else {
+        float3 points[8]; //frustum corner points, yes it is necessary to consider all of them
+
+        points[0] = ComputeViewSpacePosition(minUV, minDepth, UNITY_MATRIX_I_P);
+        points[1] = ComputeViewSpacePosition(float2(minUV.x, maxUV.y), minDepth, UNITY_MATRIX_I_P);
+        points[2] = ComputeViewSpacePosition(float2(maxUV.x, minUV.y), minDepth, UNITY_MATRIX_I_P);
+        points[3] = ComputeViewSpacePosition(maxUV, minDepth, UNITY_MATRIX_I_P);
+        points[4] = ComputeViewSpacePosition(minUV, maxDepth, UNITY_MATRIX_I_P);
+        points[5] = ComputeViewSpacePosition(float2(minUV.x, maxUV.y), maxDepth, UNITY_MATRIX_I_P);
+        points[6] = ComputeViewSpacePosition(float2(maxUV.x, minUV.y), maxDepth, UNITY_MATRIX_I_P);
+        points[7] = ComputeViewSpacePosition(maxUV, maxDepth, UNITY_MATRIX_I_P);
+
+        float3 _min = FLT_INF;
+        float3 _max = -FLT_INF;
+
+        UNITY_UNROLLX(8)
+        for (uint i = 0; i < 8; i++) {
+            _min = min(_min, points[i]);
+            _max = max(_max, points[i]);
+        }
+
+        volume.min = _min;
+        volume.max = _max;
+    }
+
+    return volume;
+}
+
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
+void LightCulling(Threading::Group group) {
+    Threading::Wave wave = group.GetWave();
+    //if (IsPixelOOB(input.dispatchId)) return;
+    //todo: check if linear depth is necessary for
+    //todo: how to avoid oob pixels causing a depth discontinuity? (oob texture loads always return 0)
+    //const float depth = LOAD_TEXTURE2D(DepthTex, group.dispatchID.xy).r;
+    const float depth = Load01Depth(group.dispatchID.xy);
     
-   // GroupMemoryBarrierWithGroupSync();
+    const float minDepth = wave.Min(depth);
+    const float maxDepth = wave.Max(depth);
+    if (wave.IsFirstLane()) {
+        //how a uint min work like a float min here
+        InterlockedMin(uMinDepth, asuint(minDepth));
+        InterlockedMax(uMaxDepth, asuint(maxDepth));
+    }
 
-    #if UNITY_REVERSED_Z
-    const float fMinDepth = asfloat(uMaxDepth);
-    const float fMaxDepth = asfloat(uMinDepth);
-    #else
-    const float fMinDepth = asfloat(uMinDepth);
-    const float fMaxDepth = asfloat(uMaxDepth);
-    #endif
-
-    const float depthRangeRecip = float(BUCKET_SIZE) / (fMaxDepth - fMinDepth);
-    const uint depthMaskIndex = clamp(floor((depth - fMinDepth) * depthRangeRecip), 0, BUCKET_SIZE - 1);
+    GroupMemoryBarrierWithGroupSync();
+    
+    const float depthRangeRecip = float(BUCKET_SIZE) / (maxDepth - minDepth);
+    const uint depthMaskIndex = clamp(floor((depth - minDepth) * depthRangeRecip), 0, BUCKET_SIZE - 1);
     uint partialDepthMask = 1 << depthMaskIndex;
-    
-    #if defined(PLATFORM_SUPPORTS_WAVE_INTRINSICS)
-    partialDepthMask = WaveActiveBitOr(partialDepthMask);
-    if (WaveIsFirstLane()) {
+
+    partialDepthMask = wave.Or(partialDepthMask);
+    if (wave.IsFirstLane()) {
         InterlockedOr(depthMask, partialDepthMask);
     }
-    #else
-    InterlockedOr(depthMask, partialDepthMask);
-    #endif
 
     uint i; //reuse loop variable
 
     UNITY_UNROLL
-    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE)
-    {
+    for (i = group.groupIndex; i < LIGHT_TILE_BUCKET_COUNT; i += THREADING_BLOCK_SIZE) {
         tile[i] = 0;
     }
 
+    const float2 minUV = float2(group.groupID.xy * TILE_SIZE) * Resolution.zw;
+    const float2 maxUV = float2((group.groupID.xy + 1) * TILE_SIZE) * Resolution.zw;
+    const Culling::AABB tileVolume = GetTileVolume(minUV, maxUV, minDepth, maxDepth);
+
     GroupMemoryBarrierWithGroupSync();
+    
 
-    const float2 minUv = PixelToUV(input.id * TILE_SIZE);
-    const float2 maxUv = PixelToUV((input.id + 1) * TILE_SIZE);
-    const AABB tileVolume = OrthoVolumeFromUVDepth(minUv, maxUv, fMinDepth, fMaxDepth);
-
+    //todo: investigate using less atomics for this somehow?
     UNITY_LOOP
-    for (i = input.index; i < MAX_LIGHTS; i += TILE_SIZE * TILE_SIZE)
-    {
+    for (i = group.groupIndex; i < LightCount; i += THREADING_BLOCK_SIZE) {
         Light light = Lights[i];
-        switch (light.Type()) {
+        AllowLight(i);
+        /*switch (light.Type()) {
+            case SPOT_LIGHT:
             case DIRECTIONAL_LIGHT:
                 AllowLight(i);
                 break;
             case POINT_LIGHT:
-                Sphere volume = PointLightCullVolume(light);
-                TransformSphereToView(volume);
-                if (!SphereIntersectsAABB(volume, tileVolume)) break; //todo: test culling against camera frustum/aabb
-                uint lightDepthMask = PointLightMask(volume, fMinDepth, depthRangeRecip);
-                if (lightDepthMask & depthMask) AllowLight(i);
+                Culling::Sphere volume = Culling::PointLightVolume(light);
+                //volume = Culling::TransformSphereToView(volume);
+                if (!Culling::SphereVsAABB(volume, tileVolume)) break; //todo: test culling against camera frustum/aabb
+                if (!(PointLightMask(volume, minDepth, depthRangeRecip) & depthMask)) break;
+                AllowLight(i);
                 break;
-            case SPOT_LIGHT:
-            //case LINE_LIGHT:
-            default: break;
-        }
+        }*/
     }
 
     GroupMemoryBarrierWithGroupSync();
 
-    const uint globalTileOffset = TileIndex(input.id) * TILE_BUCKET_COUNT;
+    const uint globalTileOffset = TileIndex(group.groupID.xy) * LIGHT_TILE_BUCKET_COUNT;
     UNITY_UNROLL
-    for (i = input.index; i < TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE)
-    {
-        CullingResults.Store(globalTileOffset + i, tile[i]);
-    }*/
-
-    uint i;
-
-    UNITY_UNROLL
-    for (i = input.index; i < LIGHT_TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
-        tile[i] = 0;
+    for (i = group.groupIndex; i < LIGHT_TILE_BUCKET_COUNT; i += THREADING_BLOCK_SIZE) {
+        const uint tileBits = tile[i];
+        #ifdef EDITOR_DEBUG
+        InterlockedAdd(tileLightCount, countbits(tileBits));
+        #endif
+        LightCullingResults.Store(globalTileOffset + i, tileBits);
     }
 
-    UNITY_LOOP
-    for (i = input.index; i < LightCount; i += TILE_SIZE * TILE_SIZE) {
-        AllowLight(i);
-    }
-
-    const uint globalTileOffset = TileIndex(input.id) * LIGHT_TILE_BUCKET_COUNT;
-    UNITY_UNROLL
-    for (i = input.index; i < LIGHT_TILE_BUCKET_COUNT; i += TILE_SIZE * TILE_SIZE) {
-        LightCullingResults.Store(globalTileOffset + i, tile[i]);
-    }
+    #ifdef EDITOR_DEBUG
+    GroupMemoryBarrierWithGroupSync();
+    CullingDebugTex[group.dispatchID.xy] = Palette(float(tileLightCount) / float(LightCount), 0);
+    #endif
 }
